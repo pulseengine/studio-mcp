@@ -52,14 +52,11 @@ impl VersionManager {
         let base_url = "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd";
         let url = format!("{}/{}/{}/studio-cli{}", base_url, version, platform_dir, file_extension);
         
-        let checksum = self.get_checksum_for_version(version, platform);
-        tracing::debug!("Version info for {}@{}: checksum={}, url={}", version, platform, checksum, url);
-        
         Ok(CliVersion {
             version: version.to_string(),
             platform: platform.to_string(),
             url,
-            checksum,
+            checksum: self.get_checksum_for_version(version, platform),
             file_name: format!("studio-cli{}", if platform == "windows" { ".exe" } else { "" }),
         })
     }

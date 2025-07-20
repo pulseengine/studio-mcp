@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tracing::{info, debug};
 use async_trait::async_trait;
 
-use pulseengine_mcp_server::{McpServer, McpBackend, ServerConfig};
+use pulseengine_mcp_server::{McpServer, McpBackend, ServerConfig, AuthConfig, TransportConfig};
 use pulseengine_mcp_protocol::{
     ServerInfo, ProtocolVersion, ServerCapabilities, Implementation,
     ToolsCapability, ResourcesCapability,
@@ -17,14 +17,12 @@ use pulseengine_mcp_protocol::{
 use studio_mcp_shared::{StudioConfig, Result, StudioError};
 use studio_cli_manager::CliManager;
 
-use crate::auth_middleware::AuthMiddleware;
 use crate::resources::ResourceProvider;
 use crate::tools::ToolProvider;
 
 pub struct StudioMcpServer {
     config: StudioConfig,
     cli_manager: Arc<CliManager>,
-    auth_middleware: Arc<AuthMiddleware>,
     resource_provider: Arc<ResourceProvider>,
     tool_provider: Arc<ToolProvider>,
 }
@@ -50,17 +48,6 @@ impl StudioMcpServer {
             }
         ).await?;
 
-        // Initialize authentication middleware
-        let mut auth_middleware = AuthMiddleware::new("dev".to_string())?;
-        
-        // Set default instance if configured
-        if let Some(default_connection) = config.get_default_connection() {
-            // Generate instance ID from connection name
-            let instance_id = format!("connection_{}", default_connection.name);
-            auth_middleware.set_default_instance(instance_id);
-        }
-        let auth_middleware = Arc::new(auth_middleware);
-
         // Initialize providers
         let resource_provider = Arc::new(ResourceProvider::new(
             cli_manager.clone(),
@@ -75,7 +62,6 @@ impl StudioMcpServer {
         Ok(Self {
             config,
             cli_manager,
-            auth_middleware,
             resource_provider,
             tool_provider,
         })
@@ -86,8 +72,12 @@ impl StudioMcpServer {
             inner: Arc::new(self),
         };
 
-        // Create server with default config and stdio transport
-        let server_config = ServerConfig::default();
+        // Create server with memory-based auth and stdio transport
+        let server_config = ServerConfig {
+            auth_config: AuthConfig::memory(),
+            transport_config: TransportConfig::stdio(),
+            ..Default::default()
+        };
         let mut server = McpServer::new(backend, server_config).await
             .map_err(|e| StudioError::Mcp(format!("Failed to create server: {}", e)))?;
         
@@ -210,11 +200,7 @@ impl McpBackend for StudioMcpBackend {
     async fn health_check(&self) -> std::result::Result<(), Self::Error> {
         // Basic health check - verify CLI is available
         match self.inner.cli_manager.ensure_cli(None).await {
-            Ok(_) => {
-                // Also cleanup authentication cache
-                self.inner.auth_middleware.cleanup_cache().await;
-                Ok(())
-            },
+            Ok(_) => Ok(()),
             Err(e) => Err(StudioError::Cli(format!("Health check failed: {}", e)))
         }
     }
