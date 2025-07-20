@@ -23,7 +23,7 @@ impl PlmResourceProvider {
     pub async fn list_resources(&self) -> Result<Vec<Resource>> {
         let mut resources = Vec::new();
 
-        // PLM base resources
+        // PLM base resources - comprehensive hierarchy
         resources.extend(vec![
             Resource {
                 uri: "studio://plm/pipelines/".to_string(),
@@ -34,17 +34,57 @@ impl PlmResourceProvider {
                 raw: None,
             },
             Resource {
-                uri: "studio://plm/projects/".to_string(),
-                name: "Projects".to_string(),
-                description: Some("List all PLM projects".to_string()),
+                uri: "studio://plm/runs/".to_string(),
+                name: "Pipeline Runs".to_string(),
+                description: Some("All pipeline execution runs".to_string()),
                 mime_type: Some("application/json".to_string()),
                 annotations: None,
                 raw: None,
             },
             Resource {
-                uri: "studio://plm/templates/".to_string(),
-                name: "Pipeline Templates".to_string(),
-                description: Some("Available pipeline templates".to_string()),
+                uri: "studio://plm/tasks/".to_string(),
+                name: "Tasks".to_string(),
+                description: Some("Pipeline tasks and task libraries".to_string()),
+                mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
+            },
+            Resource {
+                uri: "studio://plm/resources/".to_string(),
+                name: "Pipeline Resources".to_string(),
+                description: Some("Available pipeline resources".to_string()),
+                mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
+            },
+            Resource {
+                uri: "studio://plm/groups/".to_string(),
+                name: "User Groups".to_string(),
+                description: Some("Pipeline user groups and access control".to_string()),
+                mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
+            },
+            Resource {
+                uri: "studio://plm/secrets/".to_string(),
+                name: "Pipeline Secrets".to_string(),
+                description: Some("Pipeline secret management".to_string()),
+                mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
+            },
+            Resource {
+                uri: "studio://plm/triggers/".to_string(),
+                name: "Pipeline Triggers".to_string(),
+                description: Some("Pipeline trigger configurations".to_string()),
+                mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
+            },
+            Resource {
+                uri: "studio://plm/access-config/".to_string(),
+                name: "Access Configurations".to_string(),
+                description: Some("Pipeline access control configurations".to_string()),
                 mime_type: Some("application/json".to_string()),
                 annotations: None,
                 raw: None,
@@ -60,31 +100,31 @@ impl PlmResourceProvider {
                             .and_then(|v| v.as_str())
                             .unwrap_or("Unknown Pipeline");
 
-                        // Pipeline info resource
+                        // Pipeline definition resource
                         resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}/info", pipeline_id),
+                            uri: format!("studio://plm/pipelines/{}", pipeline_id),
                             name: format!("Pipeline: {}", pipeline_name),
-                            description: Some(format!("Detailed information for pipeline {}", pipeline_id)),
+                            description: Some(format!("Pipeline definition (YAML/JSON) for {}", pipeline_name)),
+                            mime_type: Some("application/yaml".to_string()),
+                            annotations: None,
+                            raw: None,
+                        });
+
+                        // Pipeline runs resource
+                        resources.push(Resource {
+                            uri: format!("studio://plm/pipelines/{}/runs", pipeline_id),
+                            name: format!("Runs: {}", pipeline_name),
+                            description: Some(format!("Execution runs for pipeline {}", pipeline_name)),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
                             raw: None,
                         });
 
-                        // Pipeline tasks resource
+                        // Pipeline events resource
                         resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}/tasks/", pipeline_id),
-                            name: format!("Tasks: {}", pipeline_name),
-                            description: Some(format!("Tasks for pipeline {}", pipeline_id)),
-                            mime_type: Some("application/json".to_string()),
-                            annotations: None,
-                            raw: None,
-                        });
-
-                        // Pipeline history resource
-                        resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}/history", pipeline_id),
-                            name: format!("History: {}", pipeline_name),
-                            description: Some(format!("Execution history for pipeline {}", pipeline_id)),
+                            uri: format!("studio://plm/pipelines/{}/events", pipeline_id),
+                            name: format!("Events: {}", pipeline_name),
+                            description: Some(format!("Recent events for pipeline {}", pipeline_name)),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
                             raw: None,
@@ -109,11 +149,26 @@ impl PlmResourceProvider {
             Some("pipelines") => {
                 self.read_pipeline_resource(uri).await
             }
-            Some("projects") => {
-                self.read_project_resource(uri).await
+            Some("runs") => {
+                self.read_runs_resource(uri).await
             }
-            Some("templates") => {
-                self.read_templates_resource().await
+            Some("tasks") => {
+                self.read_tasks_resource(uri).await
+            }
+            Some("resources") => {
+                self.read_pipeline_resources_resource(uri).await
+            }
+            Some("groups") => {
+                self.read_groups_resource(uri).await
+            }
+            Some("secrets") => {
+                self.read_secrets_resource(uri).await
+            }
+            Some("triggers") => {
+                self.read_triggers_resource(uri).await
+            }
+            Some("access-config") => {
+                self.read_access_config_resource(uri).await
             }
             None => {
                 // PLM root resource
@@ -132,14 +187,32 @@ impl PlmResourceProvider {
             "version": "1.0",
             "capabilities": [
                 "pipeline_management",
-                "task_execution",
-                "artifact_handling",
-                "build_automation"
+                "pipeline_execution",
+                "task_management",
+                "resource_allocation",
+                "access_control",
+                "secret_management",
+                "trigger_management"
             ],
             "endpoints": {
                 "pipelines": "studio://plm/pipelines/",
-                "projects": "studio://plm/projects/",
-                "templates": "studio://plm/templates/"
+                "runs": "studio://plm/runs/",
+                "tasks": "studio://plm/tasks/",
+                "resources": "studio://plm/resources/",
+                "groups": "studio://plm/groups/",
+                "secrets": "studio://plm/secrets/",
+                "triggers": "studio://plm/triggers/",
+                "access_config": "studio://plm/access-config/"
+            },
+            "cli_commands": {
+                "pipeline": ["create", "delete", "get", "list", "lock", "unlock", "update", "prettify", "weave"],
+                "run": ["start", "cancel", "get", "list", "events", "log"],
+                "task": ["manage task definitions and libraries"],
+                "resource": ["list", "assign", "revoke"],
+                "group": ["assign", "join", "leave", "revoke"],
+                "secret": ["manage pipeline secrets"],
+                "trigger": ["manage pipeline triggers"],
+                "access_config": ["manage pipeline access control"]
             }
         });
 
@@ -155,7 +228,8 @@ impl PlmResourceProvider {
                 let pipelines = self.get_pipeline_list().await?;
                 let content = serde_json::json!({
                     "pipelines": pipelines,
-                    "total": pipelines.len()
+                    "total": pipelines.len(),
+                    "description": "All available pipeline definitions"
                 });
 
                 Ok(vec![Content::Text {
@@ -164,48 +238,44 @@ impl PlmResourceProvider {
             }
             Some(pipeline_id) => {
                 match uri.path.get(3).map(|s| s.as_str()) {
-                    Some("info") => {
-                        let pipeline_info = self.get_pipeline_info(pipeline_id).await?;
-                        Ok(vec![Content::Text {
-                            text: pipeline_info.to_string(),
-                        }])
-                    }
-                    Some("tasks") => {
-                        let tasks = self.get_pipeline_tasks(pipeline_id).await?;
+                    Some("runs") => {
+                        // Pipeline runs
+                        let runs = self.get_pipeline_runs(pipeline_id).await?;
                         let content = serde_json::json!({
                             "pipeline_id": pipeline_id,
-                            "tasks": tasks,
-                            "total": tasks.as_array().map(|arr| arr.len()).unwrap_or(0)
+                            "runs": runs,
+                            "total": runs.as_array().map(|arr| arr.len()).unwrap_or(0)
                         });
 
                         Ok(vec![Content::Text {
                             text: content.to_string(),
                         }])
                     }
-                    Some("history") => {
-                        // Placeholder for pipeline history
+                    Some("events") => {
+                        // Pipeline events (recent activity)
+                        let events = self.get_pipeline_events(pipeline_id).await?;
                         let content = serde_json::json!({
                             "pipeline_id": pipeline_id,
-                            "history": [],
-                            "message": "Pipeline history not yet implemented"
+                            "events": events,
+                            "description": "Recent pipeline events and activity"
                         });
 
                         Ok(vec![Content::Text {
                             text: content.to_string(),
-                        }])
-                    }
-                    Some(task_id) => {
-                        // Individual task info
-                        let task_info = self.get_task_info(task_id).await?;
-                        Ok(vec![Content::Text {
-                            text: task_info.to_string(),
                         }])
                     }
                     None => {
-                        // Individual pipeline info (shorthand)
-                        let pipeline_info = self.get_pipeline_info(pipeline_id).await?;
+                        // Individual pipeline definition (YAML/JSON)
+                        let pipeline_def = self.get_pipeline_definition(pipeline_id).await?;
                         Ok(vec![Content::Text {
-                            text: pipeline_info.to_string(),
+                            text: pipeline_def.to_string(),
+                        }])
+                    }
+                    Some(run_id) => {
+                        // Specific run details
+                        let run_details = self.get_run_details(pipeline_id, run_id).await?;
+                        Ok(vec![Content::Text {
+                            text: run_details.to_string(),
                         }])
                     }
                 }
@@ -213,12 +283,60 @@ impl PlmResourceProvider {
         }
     }
 
-    async fn read_project_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
-        // Placeholder for project listing
+    async fn read_runs_resource(&self, uri: &ResourceUri) -> Result<Vec<Content>> {
+        match uri.path.get(2) {
+            None => {
+                // List all recent runs across all pipelines
+                let runs = self.get_all_runs().await?;
+                let content = serde_json::json!({
+                    "runs": runs,
+                    "total": runs.as_array().map(|arr| arr.len()).unwrap_or(0),
+                    "description": "All pipeline execution runs"
+                });
+
+                Ok(vec![Content::Text {
+                    text: content.to_string(),
+                }])
+            }
+            Some(run_id) => {
+                // Specific run details
+                let run_details = self.get_run_by_id(run_id).await?;
+                Ok(vec![Content::Text {
+                    text: run_details.to_string(),
+                }])
+            }
+        }
+    }
+
+    async fn read_tasks_resource(&self, uri: &ResourceUri) -> Result<Vec<Content>> {
+        match uri.path.get(2) {
+            None => {
+                // List all available tasks
+                let tasks = self.get_all_tasks().await?;
+                let content = serde_json::json!({
+                    "tasks": tasks,
+                    "description": "All available pipeline tasks and task libraries"
+                });
+
+                Ok(vec![Content::Text {
+                    text: content.to_string(),
+                }])
+            }
+            Some(task_id) => {
+                // Specific task details
+                let task_details = self.get_task_details(task_id).await?;
+                Ok(vec![Content::Text {
+                    text: task_details.to_string(),
+                }])
+            }
+        }
+    }
+
+    async fn read_pipeline_resources_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
+        let resources = self.get_pipeline_resources().await?;
         let content = serde_json::json!({
-            "projects": [],
-            "message": "Project listing not yet implemented",
-            "note": "Use CLI command 'studio-cli plm project list' for current projects"
+            "resources": resources,
+            "description": "Available pipeline resources for assignment"
         });
 
         Ok(vec![Content::Text {
@@ -226,22 +344,47 @@ impl PlmResourceProvider {
         }])
     }
 
-    async fn read_templates_resource(&self) -> Result<Vec<Content>> {
-        // Placeholder for pipeline templates
+    async fn read_groups_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
+        let groups = self.get_pipeline_groups().await?;
         let content = serde_json::json!({
-            "templates": [
-                {
-                    "name": "basic-build",
-                    "description": "Basic build pipeline template",
-                    "stages": ["checkout", "build", "test", "package"]
-                },
-                {
-                    "name": "ci-cd",
-                    "description": "Complete CI/CD pipeline template",
-                    "stages": ["checkout", "build", "test", "security-scan", "deploy"]
-                }
-            ],
-            "message": "Pipeline templates are placeholder data"
+            "groups": groups,
+            "description": "User groups with pipeline access"
+        });
+
+        Ok(vec![Content::Text {
+            text: content.to_string(),
+        }])
+    }
+
+    async fn read_secrets_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
+        let secrets = self.get_pipeline_secrets().await?;
+        let content = serde_json::json!({
+            "secrets": secrets,
+            "description": "Pipeline secrets (values hidden for security)"
+        });
+
+        Ok(vec![Content::Text {
+            text: content.to_string(),
+        }])
+    }
+
+    async fn read_triggers_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
+        let triggers = self.get_pipeline_triggers().await?;
+        let content = serde_json::json!({
+            "triggers": triggers,
+            "description": "Pipeline trigger configurations"
+        });
+
+        Ok(vec![Content::Text {
+            text: content.to_string(),
+        }])
+    }
+
+    async fn read_access_config_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
+        let access_configs = self.get_access_configs().await?;
+        let content = serde_json::json!({
+            "access_configs": access_configs,
+            "description": "Pipeline access control configurations"
         });
 
         Ok(vec![Content::Text {
@@ -251,7 +394,7 @@ impl PlmResourceProvider {
 
     // CLI interaction methods
     async fn get_pipeline_list(&self) -> Result<Vec<Value>> {
-        match self.cli_manager.execute(&["plm", "pipeline", "list"], None).await {
+        match self.cli_manager.execute(&["plm", "pipeline", "list", "--output", "json"], None).await {
             Ok(result) => {
                 if let Some(pipelines) = result.as_array() {
                     Ok(pipelines.clone())
@@ -267,21 +410,101 @@ impl PlmResourceProvider {
             }
             Err(e) => {
                 warn!("Failed to list pipelines: {}", e);
-                // Return empty list instead of failing
                 Ok(vec![])
             }
         }
     }
 
-    async fn get_pipeline_info(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "pipeline", "get", pipeline_id], None).await
+    async fn get_pipeline_definition(&self, pipeline_id: &str) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "pipeline", "get", pipeline_id, "--output", "yaml"], None).await
     }
 
-    async fn get_pipeline_tasks(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "task", "list", "--pipeline", pipeline_id], None).await
+    async fn get_pipeline_runs(&self, pipeline_id: &str) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "run", "list", "--pipeline", pipeline_id, "--output", "json"], None).await
     }
 
-    async fn get_task_info(&self, task_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "task", "get", task_id], None).await
+    async fn get_pipeline_events(&self, pipeline_id: &str) -> Result<Value> {
+        // Get recent run events for a pipeline
+        self.cli_manager.execute(&["plm", "run", "events", "--pipeline", pipeline_id, "--output", "json"], None).await
+    }
+
+    async fn get_run_details(&self, _pipeline_id: &str, run_id: &str) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "run", "get", run_id, "--output", "json"], None).await
+    }
+
+    async fn get_all_runs(&self) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "run", "list", "--output", "json"], None).await
+    }
+
+    async fn get_run_by_id(&self, run_id: &str) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "run", "get", run_id, "--output", "json"], None).await
+    }
+
+    async fn get_all_tasks(&self) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "task", "list", "--output", "json"], None).await
+    }
+
+    async fn get_task_details(&self, task_id: &str) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "task", "get", task_id, "--output", "json"], None).await
+    }
+
+    async fn get_pipeline_resources(&self) -> Result<Value> {
+        self.cli_manager.execute(&["plm", "resource", "list", "--output", "json"], None).await
+    }
+
+    async fn get_pipeline_groups(&self) -> Result<Value> {
+        // Groups might require specific access config or pipeline context
+        match self.cli_manager.execute(&["plm", "group", "list", "--output", "json"], None).await {
+            Ok(result) => Ok(result),
+            Err(_) => {
+                // Fallback to placeholder if command structure is different
+                Ok(serde_json::json!({
+                    "message": "Group listing requires specific pipeline or access config context",
+                    "suggestion": "Use pipeline-specific group queries"
+                }))
+            }
+        }
+    }
+
+    async fn get_pipeline_secrets(&self) -> Result<Value> {
+        // Secrets listing might require specific pipeline context
+        match self.cli_manager.execute(&["plm", "secret", "list", "--output", "json"], None).await {
+            Ok(result) => Ok(result),
+            Err(_) => {
+                // Fallback to placeholder if command structure is different
+                Ok(serde_json::json!({
+                    "message": "Secret listing requires specific pipeline context",
+                    "suggestion": "Use pipeline-specific secret queries"
+                }))
+            }
+        }
+    }
+
+    async fn get_pipeline_triggers(&self) -> Result<Value> {
+        // Triggers might require specific pipeline context
+        match self.cli_manager.execute(&["plm", "trigger", "list", "--output", "json"], None).await {
+            Ok(result) => Ok(result),
+            Err(_) => {
+                // Fallback to placeholder if command structure is different
+                Ok(serde_json::json!({
+                    "message": "Trigger listing requires specific pipeline context",
+                    "suggestion": "Use pipeline-specific trigger queries"
+                }))
+            }
+        }
+    }
+
+    async fn get_access_configs(&self) -> Result<Value> {
+        // Access config might require specific context
+        match self.cli_manager.execute(&["plm", "access-config", "list", "--output", "json"], None).await {
+            Ok(result) => Ok(result),
+            Err(_) => {
+                // Fallback to placeholder if command structure is different
+                Ok(serde_json::json!({
+                    "message": "Access config listing requires specific context",
+                    "suggestion": "Use specific access config queries"
+                }))
+            }
+        }
     }
 }
