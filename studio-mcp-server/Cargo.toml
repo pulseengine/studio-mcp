@@ -1,0 +1,34 @@
+[package]
+name = "studio-mcp-server"
+version = "0.1.0"
+edition = "2021"
+description = "Model Context Protocol server for WindRiver Studio CLI"
+license = "MIT"
+authors = ["PulseEngine Team"]
+repository = "https://github.com/pulseengine/studio-mcp"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# MCP dependencies
+pulseengine-mcp-server = { workspace = true }
+pulseengine-mcp-protocol = { workspace = true }
+async-trait = { workspace = true }
+
+# Local dependencies
+studio-cli-manager = { path = "../studio-cli-manager" }
+studio-mcp-shared = { path = "../studio-mcp-shared" }
+
+[features]
+default = []
+development = ["tracing-subscriber/json"]
+
+[[bin]]
+name = "studio-mcp-server"
+path = "src/main.rs"

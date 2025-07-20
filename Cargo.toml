@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "studio-mcp-server",
+    "studio-cli-manager",
+    "studio-mcp-shared"
+]
+
+[workspace.dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
+flate2 = "1.0"
+directories = "5.0"
+url = "2.4"
+sha1 = "0.10"
+hex = "0.4"
+
+# MCP dependencies - using PulseEngine MCP implementation
+pulseengine-mcp-server = "0.4.1"
+pulseengine-mcp-protocol = "0.4.1"
+async-trait = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

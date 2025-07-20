@@ -1,0 +1,33 @@
+[package]
+name = "studio-cli-manager"
+version = "0.1.0"
+edition = "2021"
+description = "Manager for downloading and updating WindRiver Studio CLI"
+license = "MIT"
+authors = ["PulseEngine Team"]
+repository = "https://github.com/pulseengine/studio-mcp"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+flate2 = { workspace = true }
+directories = { workspace = true }
+url = { workspace = true }
+sha1 = { workspace = true }
+hex = { workspace = true }
+
+# Version comparison
+version-compare = "0.1"
+
+# Local dependencies
+studio-mcp-shared = { path = "../studio-mcp-shared" }
+
+[dev-dependencies]
+tempfile = "3.8"
+mockito = "1.2"
+tokio-test = "0.4"
