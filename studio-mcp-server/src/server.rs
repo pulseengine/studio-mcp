@@ -5,17 +5,26 @@ use tracing::{info, debug};
 use async_trait::async_trait;
 
 use pulseengine_mcp_server::{McpServer, McpBackend, ServerConfig};
-use pulseengine_mcp_protocol::*;
+use pulseengine_mcp_protocol::{
+    ServerInfo, ProtocolVersion, ServerCapabilities, Implementation,
+    ToolsCapability, ResourcesCapability,
+    PaginatedRequestParam, ListToolsResult, CallToolRequestParam, CallToolResult,
+    ListResourcesResult, ReadResourceRequestParam, ReadResourceResult,
+    ListPromptsResult, GetPromptRequestParam, GetPromptResult,
+    Content, ResourceContents,
+};
 
 use studio_mcp_shared::{StudioConfig, Result, StudioError};
 use studio_cli_manager::CliManager;
 
+use crate::auth_middleware::AuthMiddleware;
 use crate::resources::ResourceProvider;
 use crate::tools::ToolProvider;
 
 pub struct StudioMcpServer {
     config: StudioConfig,
     cli_manager: Arc<CliManager>,
+    auth_middleware: Arc<AuthMiddleware>,
     resource_provider: Arc<ResourceProvider>,
     tool_provider: Arc<ToolProvider>,
 }
@@ -41,6 +50,17 @@ impl StudioMcpServer {
             }
         ).await?;
 
+        // Initialize authentication middleware
+        let mut auth_middleware = AuthMiddleware::new("dev".to_string())?;
+        
+        // Set default instance if configured
+        if let Some(default_connection) = config.get_default_connection() {
+            // Generate instance ID from connection name
+            let instance_id = format!("connection_{}", default_connection.name);
+            auth_middleware.set_default_instance(instance_id);
+        }
+        let auth_middleware = Arc::new(auth_middleware);
+
         // Initialize providers
         let resource_provider = Arc::new(ResourceProvider::new(
             cli_manager.clone(),
@@ -55,6 +75,7 @@ impl StudioMcpServer {
         Ok(Self {
             config,
             cli_manager,
+            auth_middleware,
             resource_provider,
             tool_provider,
         })
@@ -67,7 +88,7 @@ impl StudioMcpServer {
 
         // Create server with default config and stdio transport
         let server_config = ServerConfig::default();
-        let server = McpServer::new(backend, server_config)
+        let mut server = McpServer::new(backend, server_config).await
             .map_err(|e| StudioError::Mcp(format!("Failed to create server: {}", e)))?;
         
         info!("Starting PulseEngine MCP server with stdio transport");
@@ -95,23 +116,27 @@ impl McpBackend for StudioMcpBackend {
     fn get_server_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::default(),
-            name: "studio-mcp-server".to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
             capabilities: ServerCapabilities {
                 resources: Some(ResourcesCapability {
                     subscribe: Some(false),
                     list_changed: Some(false),
                 }),
-                tools: Some(ToolsCapability {}),
+                tools: Some(ToolsCapability {
+                    list_changed: Some(false),
+                }),
                 prompts: None,
                 sampling: None,
-                experimental: None,
+                logging: None,
+            },
+            server_info: Implementation {
+                name: "studio-mcp-server".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
             },
             instructions: Some("WindRiver Studio MCP Server providing access to Studio CLI functionality, focusing on Pipeline Management (PLM) features.".to_string()),
         }
     }
 
-    async fn list_tools(&self, _params: ListToolsParams) -> std::result::Result<ListToolsResult, Self::Error> {
+    async fn list_tools(&self, _request: PaginatedRequestParam) -> std::result::Result<ListToolsResult, Self::Error> {
         debug!("Listing tools");
         
         let tools = self.inner.tool_provider.list_tools().await?;
@@ -123,19 +148,19 @@ impl McpBackend for StudioMcpBackend {
         })
     }
 
-    async fn call_tool(&self, params: CallToolParams) -> std::result::Result<CallToolResult, Self::Error> {
-        debug!("Calling tool: {}", params.name);
+    async fn call_tool(&self, request: CallToolRequestParam) -> std::result::Result<CallToolResult, Self::Error> {
+        debug!("Calling tool: {}", request.name);
         
-        let content = self.inner.tool_provider.call_tool(&params.name, params.arguments).await?;
+        let content = self.inner.tool_provider.call_tool(&request.name, request.arguments).await?;
         
-        debug!("Successfully called tool: {}", params.name);
+        debug!("Successfully called tool: {}", request.name);
         Ok(CallToolResult {
             content,
             is_error: Some(false),
         })
     }
 
-    async fn list_resources(&self, _params: ListResourcesParams) -> std::result::Result<ListResourcesResult, Self::Error> {
+    async fn list_resources(&self, _request: PaginatedRequestParam) -> std::result::Result<ListResourcesResult, Self::Error> {
         debug!("Listing resources");
         
         let resources = self.inner.resource_provider.list_resources().await?;
@@ -147,14 +172,63 @@ impl McpBackend for StudioMcpBackend {
         })
     }
 
-    async fn read_resource(&self, params: ReadResourceParams) -> std::result::Result<ReadResourceResult, Self::Error> {
-        debug!("Reading resource: {}", params.uri);
+    async fn read_resource(&self, request: ReadResourceRequestParam) -> std::result::Result<ReadResourceResult, Self::Error> {
+        debug!("Reading resource: {}", request.uri);
         
-        let contents = self.inner.resource_provider.read_resource(&params.uri).await?;
+        let content = self.inner.resource_provider.read_resource(&request.uri).await?;
         
-        debug!("Successfully read resource: {}", params.uri);
+        // Convert Content to ResourceContents
+        let contents = content.into_iter().map(|c| {
+            match c {
+                Content::Text { text } => ResourceContents {
+                    uri: request.uri.clone(),
+                    mime_type: Some("text/plain".to_string()),
+                    text: Some(text),
+                    blob: None,
+                },
+                Content::Image { data, mime_type } => ResourceContents {
+                    uri: request.uri.clone(),
+                    mime_type: Some(mime_type),
+                    text: None,
+                    blob: Some(data),
+                },
+                Content::Resource { resource, text } => ResourceContents {
+                    uri: resource,
+                    mime_type: Some("application/json".to_string()),
+                    text,
+                    blob: None,
+                },
+            }
+        }).collect();
+        
+        debug!("Successfully read resource: {}", request.uri);
         Ok(ReadResourceResult {
             contents,
         })
+    }
+
+    async fn health_check(&self) -> std::result::Result<(), Self::Error> {
+        // Basic health check - verify CLI is available
+        match self.inner.cli_manager.ensure_cli(None).await {
+            Ok(_) => {
+                // Also cleanup authentication cache
+                self.inner.auth_middleware.cleanup_cache().await;
+                Ok(())
+            },
+            Err(e) => Err(StudioError::Cli(format!("Health check failed: {}", e)))
+        }
+    }
+
+    async fn list_prompts(&self, _request: PaginatedRequestParam) -> std::result::Result<ListPromptsResult, Self::Error> {
+        // Not implemented yet - return empty list
+        Ok(ListPromptsResult {
+            prompts: vec![],
+            next_cursor: None,
+        })
+    }
+
+    async fn get_prompt(&self, _request: GetPromptRequestParam) -> std::result::Result<GetPromptResult, Self::Error> {
+        // Not implemented yet
+        Err(StudioError::InvalidOperation("Prompts not yet implemented".to_string()))
     }
 }

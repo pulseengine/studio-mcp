@@ -1,7 +1,7 @@
 //! Resource providers for WindRiver Studio MCP server
 
 use std::sync::Arc;
-use pulseengine_mcp_protocol::{Resource, ResourceContents, TextResourceContents};
+use pulseengine_mcp_protocol::{Resource, Content};
 use studio_mcp_shared::{StudioConfig, Result, StudioError, ResourceUri};
 use studio_cli_manager::CliManager;
 use tracing::{debug, warn};
@@ -36,6 +36,8 @@ impl ResourceProvider {
             name: "WindRiver Studio".to_string(),
             description: Some("Root resource for WindRiver Studio CLI access".to_string()),
             mime_type: Some("application/json".to_string()),
+            annotations: None,
+            raw: None,
         });
 
         resources.push(Resource {
@@ -43,6 +45,8 @@ impl ResourceProvider {
             name: "Pipeline Management".to_string(),
             description: Some("Pipeline Management (PLM) resources and operations".to_string()),
             mime_type: Some("application/json".to_string()),
+            annotations: None,
+            raw: None,
         });
 
         // Add PLM-specific resources
@@ -56,7 +60,7 @@ impl ResourceProvider {
         Ok(resources)
     }
 
-    pub async fn read_resource(&self, uri: &str) -> Result<Vec<ResourceContents>> {
+    pub async fn read_resource(&self, uri: &str) -> Result<Vec<Content>> {
         debug!("Reading resource: {}", uri);
 
         let parsed_uri = ResourceUri::parse(uri)?;
@@ -82,7 +86,7 @@ impl ResourceProvider {
         }
     }
 
-    async fn read_root_resource(&self) -> Result<Vec<ResourceContents>> {
+    async fn read_root_resource(&self) -> Result<Vec<Content>> {
         let content = serde_json::json!({
             "name": "WindRiver Studio MCP Server",
             "version": env!("CARGO_PKG_VERSION"),
@@ -116,34 +120,30 @@ impl ResourceProvider {
             }
         });
 
-        Ok(vec![ResourceContents::Text(TextResourceContents {
+        Ok(vec![Content::Text {
             text: content.to_string(),
-            mime_type: Some("application/json".to_string()),
-        })])
+        }])
     }
 
-    async fn read_config_resource(&self, uri: &ResourceUri) -> Result<Vec<ResourceContents>> {
+    async fn read_config_resource(&self, uri: &ResourceUri) -> Result<Vec<Content>> {
         match uri.path.get(1).map(|s| s.as_str()) {
             Some("connections") => {
                 let content = serde_json::to_string_pretty(&self.config.connections)?;
-                Ok(vec![ResourceContents::Text(TextResourceContents {
+                Ok(vec![Content::Text {
                     text: content,
-                    mime_type: Some("application/json".to_string()),
-                })])
+                }])
             }
             Some("cli") => {
                 let content = serde_json::to_string_pretty(&self.config.cli)?;
-                Ok(vec![ResourceContents::Text(TextResourceContents {
+                Ok(vec![Content::Text {
                     text: content,
-                    mime_type: Some("application/json".to_string()),
-                })])
+                }])
             }
             None => {
                 let content = serde_json::to_string_pretty(&self.config)?;
-                Ok(vec![ResourceContents::Text(TextResourceContents {
+                Ok(vec![Content::Text {
                     text: content,
-                    mime_type: Some("application/json".to_string()),
-                })])
+                }])
             }
             Some(config_type) => {
                 Err(StudioError::ResourceNotFound(format!("Config type '{}' not found", config_type)))
@@ -151,7 +151,7 @@ impl ResourceProvider {
         }
     }
 
-    async fn read_status_resource(&self) -> Result<Vec<ResourceContents>> {
+    async fn read_status_resource(&self) -> Result<Vec<Content>> {
         let cli_versions = self.cli_manager.list_installed_versions().unwrap_or_default();
         let default_connection = self.config.get_default_connection();
 
@@ -177,10 +177,9 @@ impl ResourceProvider {
             }
         });
 
-        Ok(vec![ResourceContents::Text(TextResourceContents {
+        Ok(vec![Content::Text {
             text: content.to_string(),
-            mime_type: Some("application/json".to_string()),
-        })])
+        }])
     }
 
     fn list_placeholder_resources(&self) -> Vec<Resource> {
@@ -190,24 +189,32 @@ impl ResourceProvider {
                 name: "Artifact Management".to_string(),
                 description: Some("Artifact storage and retrieval (coming soon)".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
             Resource {
                 uri: "studio://vlab/".to_string(),
                 name: "Virtual Lab".to_string(),
                 description: Some("Virtual and physical lab management (coming soon)".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
             Resource {
                 uri: "studio://config/".to_string(),
                 name: "Configuration".to_string(),
                 description: Some("Server and CLI configuration".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
             Resource {
                 uri: "studio://status".to_string(),
                 name: "Server Status".to_string(),
                 description: Some("Current server status and health information".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
         ]
     }

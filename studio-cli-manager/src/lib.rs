@@ -1,9 +1,11 @@
 //! WindRiver Studio CLI manager - handles downloading, updating, and executing the CLI
 
+pub mod auth_cli;
 pub mod downloader;
 pub mod executor;
 pub mod version;
 
+pub use auth_cli::{AuthenticatedCliManager, AuthenticatedCommand};
 pub use downloader::CliDownloader;
 pub use executor::CliExecutor;
 pub use version::VersionManager;

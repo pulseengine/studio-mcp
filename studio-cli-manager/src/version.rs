@@ -52,11 +52,14 @@ impl VersionManager {
         let base_url = "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd";
         let url = format!("{}/{}/{}/studio-cli{}", base_url, version, platform_dir, file_extension);
         
+        let checksum = self.get_checksum_for_version(version, platform);
+        tracing::debug!("Version info for {}@{}: checksum={}, url={}", version, platform, checksum, url);
+        
         Ok(CliVersion {
             version: version.to_string(),
             platform: platform.to_string(),
             url,
-            checksum: String::new(), // Would need to fetch from manifest
+            checksum,
             file_name: format!("studio-cli{}", if platform == "windows" { ".exe" } else { "" }),
         })
     }
@@ -128,6 +131,7 @@ impl VersionManager {
         match (version, platform) {
             ("24.3.0", "linux") => "84a03899b5818de24a398f5c7718db00bf2f4439".to_string(),
             ("24.3.0", "windows") => "b12fbf72a24cd31cfbf23975060c061db881300b".to_string(),
+            ("24.3.0", "macos") => "ee5e90a3d838739b57ff8804b489b97499210ef4".to_string(),
             _ => String::new(), // Unknown checksum
         }
     }
@@ -147,7 +151,7 @@ impl VersionManager {
         match platform {
             "windows" => ("win64", ".exe.gz"),
             "linux" => ("linux", ".gz"),
-            "macos" => ("darwin", ".gz"),
+            "macos" => ("macos", ".gz"),
             _ => ("linux", ".gz"),
         }
     }
@@ -205,6 +209,10 @@ mod tests {
         let (dir, ext) = version_manager.get_platform_info("windows");
         assert_eq!(dir, "win64");
         assert_eq!(ext, ".exe.gz");
+        
+        let (dir, ext) = version_manager.get_platform_info("macos");
+        assert_eq!(dir, "macos");
+        assert_eq!(ext, ".gz");
     }
 
     #[tokio::test]

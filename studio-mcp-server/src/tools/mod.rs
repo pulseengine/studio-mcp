@@ -1,8 +1,7 @@
 //! Tool providers for WindRiver Studio MCP server
 
 use std::sync::Arc;
-use std::collections::HashMap;
-use pulseengine_mcp_protocol::{Tool, ToolInputSchema, Content, TextContent};
+use pulseengine_mcp_protocol::{Tool, Content};
 use studio_mcp_shared::{StudioConfig, Result, StudioError};
 use studio_cli_manager::CliManager;
 use serde_json::Value;
@@ -69,32 +68,29 @@ impl ToolProvider {
             Tool {
                 name: "studio_status".to_string(),
                 description: "Get current status of the Studio MCP server and CLI".to_string(),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some(HashMap::new()),
-                    required: Some(vec![]),
-                    additional_properties: None,
-                },
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
             },
             Tool {
                 name: "studio_version".to_string(),
                 description: "Get version information for the Studio CLI and server".to_string(),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some(HashMap::new()),
-                    required: Some(vec![]),
-                    additional_properties: None,
-                },
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
             },
             Tool {
                 name: "cli_info".to_string(),
                 description: "Get detailed information about the Studio CLI installation".to_string(),
-                input_schema: ToolInputSchema {
-                    schema_type: "object".to_string(),
-                    properties: Some(HashMap::new()),
-                    required: Some(vec![]),
-                    additional_properties: None,
-                },
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }),
             },
         ]
     }
@@ -128,10 +124,9 @@ impl ToolProvider {
             }
         });
 
-        Ok(vec![Content::Text(TextContent {
+        Ok(vec![Content::Text {
             text: serde_json::to_string_pretty(&status)?,
-            ..Default::default()
-        })])
+        }])
     }
 
     async fn get_studio_version(&self) -> Result<Vec<Content>> {
@@ -148,7 +143,7 @@ impl ToolProvider {
 
         // Try to get CLI version if available
         match self.cli_manager.ensure_cli(None).await {
-            Ok(cli_path) => {
+            Ok(_cli_path) => {
                 match self.cli_manager.execute(&["--version"], None).await {
                     Ok(cli_version) => {
                         version_info["cli"]["current_version"] = cli_version;
@@ -165,10 +160,9 @@ impl ToolProvider {
             }
         }
 
-        Ok(vec![Content::Text(TextContent {
+        Ok(vec![Content::Text {
             text: serde_json::to_string_pretty(&version_info)?,
-            ..Default::default()
-        })])
+        }])
     }
 
     async fn get_cli_info(&self) -> Result<Vec<Content>> {
@@ -215,9 +209,8 @@ impl ToolProvider {
             }
         }
 
-        Ok(vec![Content::Text(TextContent {
+        Ok(vec![Content::Text {
             text: serde_json::to_string_pretty(&info)?,
-            ..Default::default()
-        })])
+        }])
     }
 }

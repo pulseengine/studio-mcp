@@ -1,7 +1,7 @@
 //! PLM (Pipeline Management) resource provider
 
 use std::sync::Arc;
-use pulseengine_mcp_protocol::{Resource, ResourceContents, TextResourceContents};
+use pulseengine_mcp_protocol::{Resource, Content};
 use studio_mcp_shared::{StudioConfig, Result, StudioError, ResourceUri};
 use studio_cli_manager::CliManager;
 use serde_json::Value;
@@ -30,18 +30,24 @@ impl PlmResourceProvider {
                 name: "Pipelines".to_string(),
                 description: Some("List all available pipelines".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
             Resource {
                 uri: "studio://plm/projects/".to_string(),
                 name: "Projects".to_string(),
                 description: Some("List all PLM projects".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
             Resource {
                 uri: "studio://plm/templates/".to_string(),
                 name: "Pipeline Templates".to_string(),
                 description: Some("Available pipeline templates".to_string()),
                 mime_type: Some("application/json".to_string()),
+                annotations: None,
+                raw: None,
             },
         ]);
 
@@ -60,6 +66,8 @@ impl PlmResourceProvider {
                             name: format!("Pipeline: {}", pipeline_name),
                             description: Some(format!("Detailed information for pipeline {}", pipeline_id)),
                             mime_type: Some("application/json".to_string()),
+                            annotations: None,
+                            raw: None,
                         });
 
                         // Pipeline tasks resource
@@ -68,6 +76,8 @@ impl PlmResourceProvider {
                             name: format!("Tasks: {}", pipeline_name),
                             description: Some(format!("Tasks for pipeline {}", pipeline_id)),
                             mime_type: Some("application/json".to_string()),
+                            annotations: None,
+                            raw: None,
                         });
 
                         // Pipeline history resource
@@ -76,6 +86,8 @@ impl PlmResourceProvider {
                             name: format!("History: {}", pipeline_name),
                             description: Some(format!("Execution history for pipeline {}", pipeline_id)),
                             mime_type: Some("application/json".to_string()),
+                            annotations: None,
+                            raw: None,
                         });
                     }
                 }
@@ -90,7 +102,7 @@ impl PlmResourceProvider {
         Ok(resources)
     }
 
-    pub async fn read_resource(&self, uri: &ResourceUri) -> Result<Vec<ResourceContents>> {
+    pub async fn read_resource(&self, uri: &ResourceUri) -> Result<Vec<Content>> {
         debug!("PLM provider reading resource: {}", uri.to_string());
 
         match uri.path.get(1).map(|s| s.as_str()) {
@@ -113,7 +125,7 @@ impl PlmResourceProvider {
         }
     }
 
-    async fn read_plm_root(&self) -> Result<Vec<ResourceContents>> {
+    async fn read_plm_root(&self) -> Result<Vec<Content>> {
         let content = serde_json::json!({
             "name": "Pipeline Management (PLM)",
             "description": "WindRiver Studio Pipeline Management system",
@@ -131,13 +143,12 @@ impl PlmResourceProvider {
             }
         });
 
-        Ok(vec![ResourceContents::Text(TextResourceContents {
+        Ok(vec![Content::Text {
             text: content.to_string(),
-            mime_type: Some("application/json".to_string()),
-        })])
+        }])
     }
 
-    async fn read_pipeline_resource(&self, uri: &ResourceUri) -> Result<Vec<ResourceContents>> {
+    async fn read_pipeline_resource(&self, uri: &ResourceUri) -> Result<Vec<Content>> {
         match uri.path.get(2) {
             None => {
                 // List all pipelines
@@ -147,19 +158,17 @@ impl PlmResourceProvider {
                     "total": pipelines.len()
                 });
 
-                Ok(vec![ResourceContents::Text(TextResourceContents {
+                Ok(vec![Content::Text {
                     text: content.to_string(),
-                    mime_type: Some("application/json".to_string()),
-                })])
+                }])
             }
             Some(pipeline_id) => {
                 match uri.path.get(3).map(|s| s.as_str()) {
                     Some("info") => {
                         let pipeline_info = self.get_pipeline_info(pipeline_id).await?;
-                        Ok(vec![ResourceContents::Text(TextResourceContents {
+                        Ok(vec![Content::Text {
                             text: pipeline_info.to_string(),
-                            mime_type: Some("application/json".to_string()),
-                        })])
+                        }])
                     }
                     Some("tasks") => {
                         let tasks = self.get_pipeline_tasks(pipeline_id).await?;
@@ -169,10 +178,9 @@ impl PlmResourceProvider {
                             "total": tasks.as_array().map(|arr| arr.len()).unwrap_or(0)
                         });
 
-                        Ok(vec![ResourceContents::Text(TextResourceContents {
+                        Ok(vec![Content::Text {
                             text: content.to_string(),
-                            mime_type: Some("application/json".to_string()),
-                        })])
+                        }])
                     }
                     Some("history") => {
                         // Placeholder for pipeline history
@@ -182,33 +190,30 @@ impl PlmResourceProvider {
                             "message": "Pipeline history not yet implemented"
                         });
 
-                        Ok(vec![ResourceContents::Text(TextResourceContents {
+                        Ok(vec![Content::Text {
                             text: content.to_string(),
-                            mime_type: Some("application/json".to_string()),
-                        })])
+                        }])
                     }
                     Some(task_id) => {
                         // Individual task info
                         let task_info = self.get_task_info(task_id).await?;
-                        Ok(vec![ResourceContents::Text(TextResourceContents {
+                        Ok(vec![Content::Text {
                             text: task_info.to_string(),
-                            mime_type: Some("application/json".to_string()),
-                        })])
+                        }])
                     }
                     None => {
                         // Individual pipeline info (shorthand)
                         let pipeline_info = self.get_pipeline_info(pipeline_id).await?;
-                        Ok(vec![ResourceContents::Text(TextResourceContents {
+                        Ok(vec![Content::Text {
                             text: pipeline_info.to_string(),
-                            mime_type: Some("application/json".to_string()),
-                        })])
+                        }])
                     }
                 }
             }
         }
     }
 
-    async fn read_project_resource(&self, _uri: &ResourceUri) -> Result<Vec<ResourceContents>> {
+    async fn read_project_resource(&self, _uri: &ResourceUri) -> Result<Vec<Content>> {
         // Placeholder for project listing
         let content = serde_json::json!({
             "projects": [],
@@ -216,13 +221,12 @@ impl PlmResourceProvider {
             "note": "Use CLI command 'studio-cli plm project list' for current projects"
         });
 
-        Ok(vec![ResourceContents::Text(TextResourceContents {
+        Ok(vec![Content::Text {
             text: content.to_string(),
-            mime_type: Some("application/json".to_string()),
-        })])
+        }])
     }
 
-    async fn read_templates_resource(&self) -> Result<Vec<ResourceContents>> {
+    async fn read_templates_resource(&self) -> Result<Vec<Content>> {
         // Placeholder for pipeline templates
         let content = serde_json::json!({
             "templates": [
@@ -240,10 +244,9 @@ impl PlmResourceProvider {
             "message": "Pipeline templates are placeholder data"
         });
 
-        Ok(vec![ResourceContents::Text(TextResourceContents {
+        Ok(vec![Content::Text {
             text: content.to_string(),
-            mime_type: Some("application/json".to_string()),
-        })])
+        }])
     }
 
     // CLI interaction methods

@@ -7,6 +7,7 @@ use std::env;
 use tracing::{info, error};
 use tracing_subscriber::{EnvFilter, fmt};
 
+mod auth_middleware;
 mod server;
 mod resources;
 mod tools;

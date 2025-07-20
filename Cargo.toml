@@ -21,6 +21,14 @@ url = "2.4"
 sha1 = "0.10"
 hex = "0.4"
 
+# Security and authentication dependencies
+keyring = "3.0"
+jsonwebtoken = "9.0"
+chrono = { version = "0.4", features = ["serde"] }
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.22"
+
 # MCP dependencies - using PulseEngine MCP implementation
 pulseengine-mcp-server = "0.4.1"
 pulseengine-mcp-protocol = "0.4.1"
