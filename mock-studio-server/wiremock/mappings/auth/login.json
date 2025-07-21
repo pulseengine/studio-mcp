@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/api/auth/token",
+    "headers": {
+      "Content-Type": {
+        "contains": "application/json"
+      }
+    },
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$.username"
+      },
+      {
+        "matchesJsonPath": "$.password"
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "auth/token-response.json"
+  }
+}

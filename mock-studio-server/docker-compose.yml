@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  wiremock:
+    image: wiremock/wiremock:latest
+    container_name: studio-mock-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    command: 
+      - --global-response-templating
+      - --verbose
+    environment:
+      - WIREMOCK_OPTIONS=--global-response-templating --verbose
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/__admin/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: WireMock admin UI for debugging
+  wiremock-ui:
+    image: wiremock/wiremock:latest
+    container_name: studio-mock-admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    command:
+      - --admin-api
+      - --global-response-templating
+      - --verbose
+    depends_on:
+      - wiremock

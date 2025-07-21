@@ -1,0 +1,147 @@
+[
+  {
+    "id": "event-001",
+    "timestamp": "2024-01-20T14:30:00Z",
+    "type": "run_started",
+    "message": "Pipeline run started",
+    "metadata": {
+      "triggered_by": "john.doe@company.com",
+      "trigger_type": "manual"
+    }
+  },
+  {
+    "id": "event-002", 
+    "timestamp": "2024-01-20T14:30:15Z",
+    "type": "stage_started",
+    "message": "Stage 'checkout' started",
+    "metadata": {
+      "stage": "checkout",
+      "worker_node": "runner-001"
+    }
+  },
+  {
+    "id": "event-003",
+    "timestamp": "2024-01-20T14:31:30Z", 
+    "type": "stage_completed",
+    "message": "Stage 'checkout' completed successfully",
+    "metadata": {
+      "stage": "checkout",
+      "duration": 75,
+      "exit_code": 0
+    }
+  },
+  {
+    "id": "event-004",
+    "timestamp": "2024-01-20T14:31:30Z",
+    "type": "stage_started",
+    "message": "Stage 'build' started",
+    "metadata": {
+      "stage": "build",
+      "worker_node": "runner-002"
+    }
+  },
+  {
+    "id": "event-005",
+    "timestamp": "2024-01-20T14:37:15Z",
+    "type": "test_timeout",
+    "message": "Test timeout detected in stage 'build'",
+    "metadata": {
+      "stage": "build", 
+      "test_file": "UserService.test.js",
+      "timeout_duration": "30s"
+    }
+  },
+  {
+    "id": "event-006",
+    "timestamp": "2024-01-20T14:38:45Z",
+    "type": "stage_completed",
+    "message": "Stage 'build' completed successfully",
+    "metadata": {
+      "stage": "build",
+      "duration": 435,
+      "exit_code": 0,
+      "tests_passed": 45,
+      "tests_failed": 0
+    }
+  },
+  {
+    "id": "event-007",
+    "timestamp": "2024-01-20T14:38:45Z",
+    "type": "stage_started", 
+    "message": "Stage 'package' started",
+    "metadata": {
+      "stage": "package",
+      "worker_node": "runner-003"
+    }
+  },
+  {
+    "id": "event-008",
+    "timestamp": "2024-01-20T14:41:20Z",
+    "type": "network_error",
+    "message": "Network timeout connecting to registry",
+    "metadata": {
+      "stage": "package",
+      "registry": "registry.company.com",
+      "retry_attempt": 1
+    }
+  },
+  {
+    "id": "event-009",
+    "timestamp": "2024-01-20T14:42:20Z",
+    "type": "stage_completed",
+    "message": "Stage 'package' completed successfully", 
+    "metadata": {
+      "stage": "package",
+      "duration": 215,
+      "exit_code": 0,
+      "docker_image": "registry.company.com/api-service:run-abc123"
+    }
+  },
+  {
+    "id": "event-010",
+    "timestamp": "2024-01-20T14:42:20Z",
+    "type": "stage_started",
+    "message": "Stage 'deploy-staging' started",
+    "metadata": {
+      "stage": "deploy-staging",
+      "worker_node": "runner-001",
+      "environment": "staging"
+    }
+  },
+  {
+    "id": "event-011",
+    "timestamp": "2024-01-20T14:43:30Z",
+    "type": "health_check_failed",
+    "message": "Health check failed during deployment",
+    "metadata": {
+      "stage": "deploy-staging",
+      "service": "api-service",
+      "status_code": 503,
+      "retry_attempt": 1
+    }
+  },
+  {
+    "id": "event-012",
+    "timestamp": "2024-01-20T14:45:00Z",
+    "type": "stage_completed",
+    "message": "Stage 'deploy-staging' completed successfully",
+    "metadata": {
+      "stage": "deploy-staging", 
+      "duration": 160,
+      "exit_code": 0,
+      "deployment_url": "https://api-staging.company.com"
+    }
+  },
+  {
+    "id": "event-013",
+    "timestamp": "2024-01-20T14:45:00Z",
+    "type": "run_completed",
+    "message": "Pipeline run completed successfully",
+    "metadata": {
+      "total_duration": 900,
+      "stages_completed": 4,
+      "stages_failed": 0,
+      "final_status": "completed"
+    }
+  }
+]

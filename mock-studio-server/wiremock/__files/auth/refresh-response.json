@@ -1,0 +1,7 @@
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LWlkIn0.eyJzdWIiOiJ0ZXN0LXVzZXIiLCJpYXQiOjE3MDAwMDM2MDAsImV4cCI6MTcwMDAwNzIwMCwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwiYXVkIjoic3R1ZGlvLWNsaSIsInNjb3BlIjoicGxtOnJlYWQgcGxtOndyaXRlIGFydGlmYWN0czpyZWFkIHZsYWI6cmVhZCJ9.refreshed-mock-signature-data",
+  "refresh_token": "new-refresh-token-mock-data-67890",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "plm:read plm:write artifacts:read vlab:read"
+}

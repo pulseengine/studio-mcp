@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/api/health"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "healthy",
+      "timestamp": "{{now}}",
+      "version": "24.3.0",
+      "services": {
+        "plm": "running",
+        "auth": "running",
+        "artifacts": "running",
+        "vlab": "running"
+      }
+    },
+    "transformers": ["response-template"]
+  }
+}

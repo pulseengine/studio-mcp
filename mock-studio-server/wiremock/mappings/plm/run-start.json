@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/api/plm/runs",
+    "headers": {
+      "Authorization": {
+        "matches": "Bearer .*"
+      },
+      "Content-Type": {
+        "contains": "application/json"
+      }
+    },
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$.pipeline_name"
+      }
+    ]
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "run_id": "run-{{randomValue length=8 type='ALPHANUMERIC'}}",
+      "pipeline_name": "{{jsonPath request.body '$.pipeline_name'}}",
+      "status": "started",
+      "created_at": "{{now}}",
+      "message": "Pipeline run started successfully"
+    },
+    "transformers": ["response-template"]
+  }
+}

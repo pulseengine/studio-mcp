@@ -1,0 +1,119 @@
+[
+  {
+    "id": "git-clone",
+    "name": "Git Clone Task",
+    "description": "Clone a Git repository",
+    "category": "source-control",
+    "version": "1.2.0",
+    "image": "alpine/git:latest",
+    "parameters": [
+      {
+        "name": "repository",
+        "type": "string",
+        "required": true,
+        "description": "Git repository URL"
+      },
+      {
+        "name": "branch", 
+        "type": "string",
+        "required": false,
+        "default": "main",
+        "description": "Branch to checkout"
+      }
+    ]
+  },
+  {
+    "id": "npm-build",
+    "name": "NPM Build Task",
+    "description": "Build Node.js application using NPM",
+    "category": "build",
+    "version": "2.1.3",
+    "image": "node:18-alpine",
+    "parameters": [
+      {
+        "name": "build_command",
+        "type": "string", 
+        "required": false,
+        "default": "npm run build",
+        "description": "NPM build command"
+      },
+      {
+        "name": "node_version",
+        "type": "string",
+        "required": false,
+        "default": "18",
+        "description": "Node.js version"
+      }
+    ]
+  },
+  {
+    "id": "docker-build",
+    "name": "Docker Build Task",
+    "description": "Build and push Docker images",
+    "category": "packaging",
+    "version": "3.0.1",
+    "image": "docker:latest",
+    "parameters": [
+      {
+        "name": "dockerfile",
+        "type": "string",
+        "required": false,
+        "default": "Dockerfile",
+        "description": "Path to Dockerfile"
+      },
+      {
+        "name": "registry",
+        "type": "string",
+        "required": true,
+        "description": "Docker registry URL"
+      }
+    ]
+  },
+  {
+    "id": "kubectl-deploy",
+    "name": "Kubernetes Deploy Task", 
+    "description": "Deploy applications to Kubernetes",
+    "category": "deployment",
+    "version": "1.5.2",
+    "image": "bitnami/kubectl:latest",
+    "parameters": [
+      {
+        "name": "namespace",
+        "type": "string",
+        "required": false,
+        "default": "default",
+        "description": "Kubernetes namespace"
+      },
+      {
+        "name": "manifests",
+        "type": "array",
+        "required": true,
+        "description": "Kubernetes manifest files"
+      }
+    ]
+  },
+  {
+    "id": "security-scan",
+    "name": "Security Scan Task",
+    "description": "Scan for security vulnerabilities",
+    "category": "security",
+    "version": "2.3.0",
+    "image": "aquasec/trivy:latest",
+    "parameters": [
+      {
+        "name": "scan_type",
+        "type": "string",
+        "required": false,
+        "default": "image",
+        "description": "Type of scan (image, filesystem, repository)"
+      },
+      {
+        "name": "severity",
+        "type": "string",
+        "required": false,
+        "default": "HIGH,CRITICAL",
+        "description": "Severity levels to report"
+      }
+    ]
+  }
+]

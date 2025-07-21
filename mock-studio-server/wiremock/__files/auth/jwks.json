@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "test-key-id",
+      "alg": "RS256",
+      "n": "mock-modulus-data-for-testing-purposes-only",
+      "e": "AQAB"
+    }
+  ]
+}

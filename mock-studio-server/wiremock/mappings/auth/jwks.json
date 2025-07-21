@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/.well-known/jwks.json"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=3600"
+    },
+    "bodyFileName": "auth/jwks.json"
+  }
+}
