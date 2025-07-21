@@ -1,0 +1,41 @@
+{
+  "connections": {
+    "mock_studio": {
+      "name": "Mock Studio Server",
+      "url": "http://localhost:8080",
+      "username": "admin",
+      "token": null
+    }
+  },
+  "default_connection": "mock_studio",
+  "cli": {
+    "download_base_url": "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd",
+    "version": "24.3.0",
+    "install_dir": "/tmp/studio-mcp-cli",
+    "timeout": 300,
+    "auto_update": false,
+    "update_check_interval": 24
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 300,
+    "max_size": 1000
+  },
+  "logging": {
+    "level": "debug",
+    "format": "pretty",
+    "file_logging": true,
+    "log_file": "mock-testing.log"
+  },
+  "mock_server": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 8080,
+    "admin_port": 8081,
+    "scenarios": [
+      "happy_path",
+      "error_scenarios", 
+      "timeout_scenarios"
+    ]
+  }
+}
