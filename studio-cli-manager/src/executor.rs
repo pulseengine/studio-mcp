@@ -7,6 +7,7 @@ use tokio::process::Command;
 use serde_json::Value;
 
 pub struct CliExecutor {
+    #[allow(dead_code)]
     install_dir: PathBuf,
 }
 

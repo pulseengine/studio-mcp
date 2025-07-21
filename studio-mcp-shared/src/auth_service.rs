@@ -4,7 +4,6 @@ use crate::{AuthManager, AuthCredentials, AuthToken, TokenStorage, StudioError, 
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode_header, Algorithm, DecodingKey, Validation};
 
 /// Studio authentication service
@@ -14,6 +13,7 @@ pub struct StudioAuthService {
     /// HTTP client for API requests
     client: Client,
     /// Default request timeout
+    #[allow(dead_code)]
     timeout: Duration,
 }
 
@@ -31,6 +31,7 @@ struct AuthRequest {
 struct AuthResponse {
     access_token: String,
     refresh_token: Option<String>,
+    #[allow(dead_code)]
     token_type: String,
     expires_in: i64,
     scope: Option<String>,
@@ -45,6 +46,7 @@ struct ApiErrorResponse {
 
 /// JWT token claims for validation
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TokenClaims {
     sub: String,
     exp: i64,

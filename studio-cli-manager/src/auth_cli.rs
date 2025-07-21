@@ -1,7 +1,7 @@
 //! Authentication-aware CLI manager that integrates with Studio auth
 
 use crate::CliManager;
-use studio_mcp_shared::{StudioAuthService, AuthCredentials, Result, StudioError};
+use studio_mcp_shared::{StudioAuthService, AuthCredentials, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;

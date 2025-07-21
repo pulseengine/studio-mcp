@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use reqwest::Client;
 
 pub struct VersionManager {
+    #[allow(dead_code)]
     client: Client,
     install_dir: PathBuf,
     cache: tokio::sync::RwLock<Option<(std::time::Instant, Vec<CliVersion>)>>,

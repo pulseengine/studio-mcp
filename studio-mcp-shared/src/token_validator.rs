@@ -57,6 +57,7 @@ struct JwksEntry {
     /// When this entry expires
     expires_at: DateTime<Utc>,
     /// Studio instance URL this belongs to
+    #[allow(dead_code)]
     studio_url: String,
 }
 
@@ -85,10 +86,12 @@ struct JwkKey {
     kty: String,
     /// Key use (usually "sig")
     #[serde(rename = "use")]
+    #[allow(dead_code)]
     key_use: Option<String>,
     /// Key ID
     kid: Option<String>,
     /// Algorithm
+    #[allow(dead_code)]
     alg: Option<String>,
     /// RSA modulus (base64url)
     n: Option<String>,

@@ -5,9 +5,9 @@ use tokio::sync::RwLock;
 use std::collections::HashMap;
 use studio_mcp_shared::{
     AuthCredentials, TokenValidator, ValidationResult, StudioAuthService,
-    StudioTokenClaims, Result, StudioError
+    Result, StudioError
 };
-use tracing::{debug, warn, error};
+use tracing::{debug, error};
 
 /// Authentication context for MCP operations
 #[derive(Debug, Clone)]
