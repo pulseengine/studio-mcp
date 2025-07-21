@@ -161,16 +161,85 @@ impl PlmToolProvider {
             },
             Tool {
                 name: "plm_get_run_log".to_string(),
-                description: "Get logs for a specific pipeline run".to_string(),
+                description: "Get logs for a specific pipeline run with optional filtering".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "run_id": {
                             "type": "string",
                             "description": "ID of the pipeline run to get logs for"
+                        },
+                        "lines": {
+                            "type": "integer",
+                            "description": "Number of lines to retrieve (default: all)",
+                            "minimum": 1
+                        },
+                        "tail": {
+                            "type": "boolean",
+                            "description": "Get logs from the end (tail mode)"
+                        },
+                        "errors_only": {
+                            "type": "boolean",
+                            "description": "Filter to show only error/warning lines"
+                        },
+                        "task_name": {
+                            "type": "string",
+                            "description": "Filter logs for specific task"
+                        },
+                        "since": {
+                            "type": "string",
+                            "description": "Show logs since timestamp (ISO format)"
                         }
                     },
                     "required": ["run_id"]
+                }),
+            },
+            Tool {
+                name: "plm_get_pipeline_errors".to_string(),
+                description: "Get error summary and recent errors for a pipeline".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline to analyze"
+                        },
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "ID of the pipeline to analyze"
+                        },
+                        "recent_runs": {
+                            "type": "integer",
+                            "description": "Number of recent runs to analyze (default: 5)",
+                            "minimum": 1,
+                            "maximum": 50
+                        }
+                    },
+                    "required": []
+                }),
+            },
+            Tool {
+                name: "plm_get_task_errors".to_string(),
+                description: "Get detailed error information for a specific pipeline task".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "run_id": {
+                            "type": "string",
+                            "description": "Pipeline run ID containing the task"
+                        },
+                        "task_name": {
+                            "type": "string",
+                            "description": "Name of the task to analyze"
+                        },
+                        "context_lines": {
+                            "type": "integer",
+                            "description": "Number of context lines around errors (default: 10)",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    "required": ["run_id", "task_name"]
                 }),
             },
             Tool {
@@ -228,6 +297,8 @@ impl PlmToolProvider {
             "plm_get_run_log" => self.get_run_log(args).await,
             "plm_get_run_events" => self.get_run_events(args).await,
             "plm_list_resources" => self.list_resources(args).await,
+            "plm_get_pipeline_errors" => self.get_pipeline_errors(args).await,
+            "plm_get_task_errors" => self.get_task_errors(args).await,
             _ => {
                 error!("Unknown PLM tool: {}", name);
                 Err(StudioError::InvalidOperation(format!("PLM tool '{}' not found", name)))
@@ -523,12 +594,53 @@ impl PlmToolProvider {
             .and_then(|v| v.as_str())
             .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
 
-        match self.cli_manager.execute(&["plm", "run", "log", run_id, "--output", "json"], None).await {
-            Ok(result) => {
+        let mut cli_args = vec!["plm", "run", "log", run_id, "--output", "json"];
+        
+        // Build CLI arguments based on filtering parameters
+        let mut additional_args = Vec::new();
+        
+        if let Some(lines) = args.get("lines").and_then(|v| v.as_u64()) {
+            additional_args.push("--lines".to_string());
+            additional_args.push(lines.to_string());
+        }
+        
+        if args.get("tail").and_then(|v| v.as_bool()).unwrap_or(false) {
+            additional_args.push("--tail".to_string());
+        }
+        
+        if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
+            additional_args.push("--task".to_string());
+            additional_args.push(task_name.to_string());
+        }
+        
+        if let Some(since) = args.get("since").and_then(|v| v.as_str()) {
+            additional_args.push("--since".to_string());
+            additional_args.push(since.to_string());
+        }
+
+        // Add additional args as string references
+        for arg in &additional_args {
+            cli_args.push(arg.as_str());
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(mut result) => {
+                // Apply client-side error filtering if requested
+                if args.get("errors_only").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    result = self.filter_error_logs(result);
+                }
+
                 let response = json!({
                     "success": true,
                     "run_id": run_id,
-                    "data": result
+                    "data": result,
+                    "filters_applied": {
+                        "lines": args.get("lines"),
+                        "tail": args.get("tail").and_then(|v| v.as_bool()).unwrap_or(false),
+                        "errors_only": args.get("errors_only").and_then(|v| v.as_bool()).unwrap_or(false),
+                        "task_name": args.get("task_name"),
+                        "since": args.get("since")
+                    }
                 });
 
                 Ok(vec![Content::Text {
@@ -625,5 +737,237 @@ impl PlmToolProvider {
                 }])
             }
         }
+    }
+
+    async fn get_pipeline_errors(&self, args: Value) -> Result<Vec<Content>> {
+        // Get pipeline identifier
+        let pipeline_identifier = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+            name
+        } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+            id
+        } else {
+            return Err(StudioError::InvalidOperation("Either pipeline_name or pipeline_id is required".to_string()));
+        };
+
+        let recent_runs = args.get("recent_runs")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(5) as usize;
+
+        // Get recent runs for this pipeline
+        let runs_result = match self.cli_manager.execute(&["plm", "run", "list", "--pipeline", pipeline_identifier, "--output", "json"], None).await {
+            Ok(result) => result,
+            Err(e) => {
+                error!("Failed to get runs for pipeline {}: {}", pipeline_identifier, e);
+                return Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&json!({
+                        "success": false,
+                        "pipeline": pipeline_identifier,
+                        "error": e.to_string(),
+                        "message": "Failed to retrieve pipeline runs"
+                    }))?,
+                }]);
+            }
+        };
+
+        // Extract run IDs and analyze errors
+        let mut error_summary = json!({
+            "pipeline": pipeline_identifier,
+            "analyzed_runs": 0,
+            "total_errors": 0,
+            "error_patterns": {},
+            "recent_errors": []
+        });
+
+        if let Some(runs) = runs_result.as_array() {
+            let limited_runs: Vec<_> = runs.iter().take(recent_runs).collect();
+            error_summary["analyzed_runs"] = json!(limited_runs.len());
+
+            for run in limited_runs {
+                if let Some(run_id) = run.get("id").and_then(|v| v.as_str()) {
+                    // Get logs for this run and analyze errors
+                    if let Ok(log_result) = self.cli_manager.execute(&["plm", "run", "log", run_id, "--output", "json"], None).await {
+                        let filtered_errors = self.filter_error_logs(log_result);
+                        
+                        // Count and categorize errors (simplified implementation)
+                        if let Some(log_text) = filtered_errors.as_str() {
+                            let error_count = log_text.lines()
+                                .filter(|line| line.to_lowercase().contains("error") || line.to_lowercase().contains("fail"))
+                                .count();
+                            
+                            error_summary["total_errors"] = json!(
+                                error_summary["total_errors"].as_u64().unwrap_or(0) + error_count as u64
+                            );
+
+                            if error_count > 0 {
+                                let recent_errors = error_summary["recent_errors"].as_array_mut().unwrap();
+                                recent_errors.push(json!({
+                                    "run_id": run_id,
+                                    "error_count": error_count,
+                                    "timestamp": run.get("created_at").unwrap_or(&json!("unknown"))
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(vec![Content::Text {
+            text: serde_json::to_string_pretty(&json!({
+                "success": true,
+                "data": error_summary
+            }))?,
+        }])
+    }
+
+    async fn get_task_errors(&self, args: Value) -> Result<Vec<Content>> {
+        let run_id = args.get("run_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
+
+        let task_name = args.get("task_name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("task_name is required".to_string()))?;
+
+        let context_lines = args.get("context_lines")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(10);
+
+        // Get logs for the specific task
+        let mut cli_args = vec!["plm", "run", "log", run_id, "--task", task_name, "--output", "json"];
+        
+        // Add context lines if the CLI supports it
+        let context_str = context_lines.to_string();
+        cli_args.extend_from_slice(&["--lines", &context_str]);
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                // Filter for error lines and add context
+                let error_analysis = self.analyze_task_errors(result, context_lines as usize);
+
+                let response = json!({
+                    "success": true,
+                    "run_id": run_id,
+                    "task_name": task_name,
+                    "context_lines": context_lines,
+                    "data": error_analysis
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to get task errors for run {} task {}: {}", run_id, task_name, e);
+                let error_response = json!({
+                    "success": false,
+                    "run_id": run_id,
+                    "task_name": task_name,
+                    "error": e.to_string(),
+                    "message": "Failed to retrieve task error information"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    // Helper methods for error filtering and analysis
+    fn filter_error_logs(&self, logs: Value) -> Value {
+        if let Some(log_str) = logs.as_str() {
+            let error_lines: Vec<&str> = log_str
+                .lines()
+                .filter(|line| {
+                    let lower = line.to_lowercase();
+                    lower.contains("error") || 
+                    lower.contains("fail") || 
+                    lower.contains("exception") ||
+                    lower.contains("panic") ||
+                    lower.contains("fatal") ||
+                    lower.contains("warn")
+                })
+                .collect();
+            
+            json!(error_lines.join("\n"))
+        } else {
+            logs
+        }
+    }
+
+    fn analyze_task_errors(&self, logs: Value, context_lines: usize) -> Value {
+        if let Some(log_str) = logs.as_str() {
+            let lines: Vec<&str> = log_str.lines().collect();
+            let mut error_blocks = Vec::new();
+
+            for (i, line) in lines.iter().enumerate() {
+                let lower = line.to_lowercase();
+                if lower.contains("error") || lower.contains("fail") || lower.contains("exception") {
+                    // Get context around error
+                    let start = i.saturating_sub(context_lines);
+                    let end = std::cmp::min(i + context_lines + 1, lines.len());
+                    
+                    let context_block: Vec<String> = lines[start..end]
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, l)| {
+                            let line_num = start + idx;
+                            if line_num == i {
+                                format!(">>> {} ERROR: {}", line_num, l) // Mark error line
+                            } else {
+                                format!("    {} {}", line_num, l)
+                            }
+                        })
+                        .collect();
+
+                    error_blocks.push(json!({
+                        "error_line": i,
+                        "error_text": line,
+                        "context": context_block.join("\n")
+                    }));
+                }
+            }
+
+            json!({
+                "total_errors": error_blocks.len(),
+                "error_blocks": error_blocks,
+                "analysis": {
+                    "common_patterns": self.extract_error_patterns(&error_blocks),
+                    "severity": if error_blocks.len() > 5 { "high" } else if error_blocks.len() > 2 { "medium" } else { "low" }
+                }
+            })
+        } else {
+            json!({
+                "total_errors": 0,
+                "error_blocks": [],
+                "message": "No text logs available for analysis"
+            })
+        }
+    }
+
+    fn extract_error_patterns(&self, error_blocks: &[Value]) -> Value {
+        let mut patterns = std::collections::HashMap::new();
+        
+        for block in error_blocks {
+            if let Some(error_text) = block.get("error_text").and_then(|v| v.as_str()) {
+                let lower = error_text.to_lowercase();
+                
+                // Simple pattern matching
+                if lower.contains("connection") || lower.contains("network") {
+                    *patterns.entry("network_errors").or_insert(0) += 1;
+                } else if lower.contains("permission") || lower.contains("access") {
+                    *patterns.entry("permission_errors").or_insert(0) += 1;
+                } else if lower.contains("timeout") {
+                    *patterns.entry("timeout_errors").or_insert(0) += 1;
+                } else if lower.contains("not found") || lower.contains("missing") {
+                    *patterns.entry("missing_resource_errors").or_insert(0) += 1;
+                } else {
+                    *patterns.entry("other_errors").or_insert(0) += 1;
+                }
+            }
+        }
+        
+        json!(patterns)
     }
 }
