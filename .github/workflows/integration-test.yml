@@ -1,0 +1,163 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  integration-test:
+    name: Integration Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: tests/integration/package-lock.json
+
+    - name: Install Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install jq (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Install jq (macOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install jq
+
+    - name: Install jq (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        curl -L -o jq.exe https://github.com/stedolan/jq/releases/download/jq-1.6/jq-win64.exe
+        mkdir -p $env:USERPROFILE\bin
+        mv jq.exe $env:USERPROFILE\bin\
+        echo "$env:USERPROFILE\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Install Python requests
+      run: python -m pip install --upgrade pip requests
+
+    - name: Install Node.js dependencies
+      working-directory: tests/integration
+      run: npm ci
+
+    - name: Build MCP server
+      run: cargo build --release
+
+    - name: Start Docker (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo systemctl start docker
+        sudo docker --version
+
+    - name: Start Docker (macOS)  
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Docker Desktop should already be available on macOS runners
+        docker --version
+
+    - name: Start Docker (Windows)
+      if: matrix.os == 'windows-latest' 
+      run: |
+        # Docker Desktop should already be available on Windows runners
+        docker --version
+
+    - name: Set executable permissions (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        chmod +x run_integration_tests.sh
+        chmod +x tests/integration/simple_integration_test.sh
+
+    - name: Run integration tests (Unix)
+      if: matrix.os != 'windows-latest'
+      run: ./run_integration_tests.sh
+      timeout-minutes: 10
+
+    - name: Run integration tests (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        # Build MCP server
+        cargo build --release
+        
+        # Test configuration initialization
+        .\target\release\studio-mcp-server.exe --init test-config-temp.json
+        if (Test-Path test-config-temp.json) { 
+          Write-Host "✅ Configuration initialization working"
+          Remove-Item test-config-temp.json
+        } else {
+          Write-Host "❌ Configuration initialization failed" 
+          exit 1
+        }
+        
+        # Start mock server
+        cd mock-studio-server
+        docker-compose up -d
+        Start-Sleep -Seconds 8
+        
+        # Test mock server health
+        try {
+          $health = Invoke-RestMethod -Uri "http://localhost:8080/api/health" -TimeoutSec 10
+          if ($health.status -eq "healthy") {
+            Write-Host "✅ Mock server is healthy"
+          } else {
+            Write-Host "❌ Mock server health check failed"
+            exit 1
+          }
+        } catch {
+          Write-Host "❌ Mock server health check failed: $_"
+          exit 1
+        }
+        
+        # Test Node.js MCP integration
+        cd ..\tests\integration
+        npm test
+        
+        # Cleanup
+        cd ..\..\mock-studio-server
+        docker-compose down -v
+      timeout-minutes: 10
+
+    - name: Cleanup Docker containers
+      if: always()
+      run: |
+        cd mock-studio-server
+        docker-compose down -v || true
+      continue-on-error: true
+
+    - name: Upload test artifacts (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-logs-${{ matrix.os }}
+        path: |
+          tests/integration/*.log
+          tests/integration/test-*.json
+        retention-days: 7
