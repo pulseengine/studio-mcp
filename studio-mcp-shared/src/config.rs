@@ -35,14 +35,33 @@ pub struct CliConfig {
     /// Directory to store CLI binaries
     pub install_dir: Option<String>,
     
-    /// Timeout for CLI operations (seconds)
+    /// Timeout for CLI operations (seconds) - deprecated, use timeouts instead
     pub timeout: u64,
+    
+    /// Operation-specific timeouts
+    pub timeouts: TimeoutConfig,
     
     /// Whether to auto-update CLI
     pub auto_update: bool,
     
     /// Update check interval (hours)
     pub update_check_interval: u64,
+}
+
+/// Timeout configuration for different operation types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeoutConfig {
+    /// Quick operations like list, get (seconds)
+    pub quick_operations: u64,
+    
+    /// Medium operations like run, cancel (seconds)
+    pub medium_operations: u64,
+    
+    /// Long operations like logs, streaming (seconds)
+    pub long_operations: u64,
+    
+    /// Network requests (seconds)
+    pub network_requests: u64,
 }
 
 /// Cache configuration
@@ -92,9 +111,46 @@ impl Default for CliConfig {
             download_base_url: "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd".to_string(),
             version: "auto".to_string(),
             install_dir: None,
-            timeout: 300, // 5 minutes
+            timeout: 300, // 5 minutes - deprecated
+            timeouts: TimeoutConfig::default(),
             auto_update: true,
             update_check_interval: 24, // 24 hours
+        }
+    }
+}
+
+impl Default for TimeoutConfig {
+    fn default() -> Self {
+        Self {
+            quick_operations: 30,    // 30 seconds for list, get operations
+            medium_operations: 300,  // 5 minutes for run, cancel operations
+            long_operations: 600,    // 10 minutes for logs, streaming operations
+            network_requests: 30,    // 30 seconds for HTTP requests
+        }
+    }
+}
+
+/// Operation types for timeout selection
+#[derive(Debug, Clone, Copy)]
+pub enum OperationType {
+    /// Quick operations like list, get
+    Quick,
+    /// Medium operations like run, cancel
+    Medium,
+    /// Long operations like logs, streaming
+    Long,
+    /// Network requests
+    Network,
+}
+
+impl TimeoutConfig {
+    /// Get timeout for specific operation type
+    pub fn get_timeout(&self, operation_type: OperationType) -> u64 {
+        match operation_type {
+            OperationType::Quick => self.quick_operations,
+            OperationType::Medium => self.medium_operations,
+            OperationType::Long => self.long_operations,
+            OperationType::Network => self.network_requests,
         }
     }
 }

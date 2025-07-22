@@ -12,4 +12,4 @@ pub use auth_service::{StudioAuthService, StudioInstance, InstanceStatus};
 pub use error::{StudioError, Result};
 pub use token_validator::{TokenValidator, StudioTokenClaims, ValidationResult};
 pub use types::*;
-pub use config::StudioConfig;
+pub use config::{StudioConfig, OperationType, TimeoutConfig, CliConfig, CacheConfig, LoggingConfig};
