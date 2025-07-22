@@ -1,9 +1,11 @@
 //! CLI executor - handles executing CLI commands and parsing output
 
-use studio_mcp_shared::{Result, StudioError};
+use studio_mcp_shared::{Result, StudioError, OperationType};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::process::Command;
+use tokio::time::timeout;
 use serde_json::Value;
 
 pub struct CliExecutor {
@@ -23,6 +25,17 @@ impl CliExecutor {
         args: &[&str],
         working_dir: Option<&Path>,
     ) -> Result<Value> {
+        self.execute_with_timeout(cli_path, args, working_dir, Duration::from_secs(300)).await
+    }
+
+    /// Execute CLI command with custom timeout
+    pub async fn execute_with_timeout(
+        &self,
+        cli_path: &Path,
+        args: &[&str],
+        working_dir: Option<&Path>,
+        timeout_duration: Duration,
+    ) -> Result<Value> {
         tracing::debug!("Executing CLI: {} {}", cli_path.display(), args.join(" "));
 
         let mut cmd = Command::new(cli_path);
@@ -39,7 +52,17 @@ impl CliExecutor {
         full_args.extend_from_slice(args);
         cmd.args(&full_args[2..]); // Skip the first two as they're already added
 
-        let output = cmd.output().await?;
+        // Execute with timeout
+        let output_result = timeout(timeout_duration, cmd.output()).await;
+        
+        let output = match output_result {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => return Err(StudioError::Cli(format!("Command execution failed: {}", e))),
+            Err(_) => return Err(StudioError::Cli(format!(
+                "Command timed out after {} seconds", 
+                timeout_duration.as_secs()
+            ))),
+        };
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

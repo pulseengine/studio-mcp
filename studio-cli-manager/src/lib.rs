@@ -83,6 +83,17 @@ impl CliManager {
         self.executor.execute(&cli_path, args, working_dir).await
     }
 
+    /// Execute a CLI command with custom timeout
+    pub async fn execute_with_timeout(
+        &self, 
+        args: &[&str], 
+        working_dir: Option<&Path>,
+        timeout_duration: std::time::Duration,
+    ) -> Result<serde_json::Value> {
+        let cli_path = self.ensure_cli(None).await?;
+        self.executor.execute_with_timeout(&cli_path, args, working_dir, timeout_duration).await
+    }
+
     /// Get the path where CLI should be installed for a given version
     fn get_cli_path(&self, version: &str) -> PathBuf {
         let filename = if cfg!(windows) {
