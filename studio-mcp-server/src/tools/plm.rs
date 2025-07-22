@@ -126,6 +126,34 @@ impl PlmToolProvider {
                 }),
             },
             
+            // ID resolution tool
+            Tool {
+                name: "plm_resolve_run_id".to_string(),
+                description: "Convert pipeline name and run number to run ID".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline"
+                        },
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "ID of the pipeline (alternative to pipeline_name)"
+                        },
+                        "run_number": {
+                            "type": "integer",
+                            "description": "Run number within the pipeline (1 = latest, 2 = second latest, etc.)",
+                            "minimum": 1
+                        }
+                    },
+                    "anyOf": [
+                        {"required": ["pipeline_name", "run_number"]},
+                        {"required": ["pipeline_id", "run_number"]}
+                    ]
+                }),
+            },
+            
             // Pipeline run management tools
             Tool {
                 name: "plm_list_runs".to_string(),
@@ -147,27 +175,57 @@ impl PlmToolProvider {
             },
             Tool {
                 name: "plm_get_run".to_string(),
-                description: "Get detailed information about a specific pipeline run".to_string(),
+                description: "Get detailed information about a specific pipeline run by ID or pipeline name/run number".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "run_id": {
                             "type": "string",
                             "description": "ID of the pipeline run to retrieve"
+                        },
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline (alternative to run_id)"
+                        },
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "ID of the pipeline (alternative to run_id)"
+                        },
+                        "run_number": {
+                            "type": "integer",
+                            "description": "Run number within the pipeline (1 = latest, 2 = second latest, etc.)",
+                            "minimum": 1
                         }
                     },
-                    "required": ["run_id"]
+                    "anyOf": [
+                        {"required": ["run_id"]},
+                        {"required": ["pipeline_name", "run_number"]},
+                        {"required": ["pipeline_id", "run_number"]}
+                    ]
                 }),
             },
             Tool {
                 name: "plm_get_run_log".to_string(),
-                description: "Get logs for a specific pipeline run with optional filtering".to_string(),
+                description: "Get logs for a specific pipeline run by ID or pipeline name/run number with optional filtering".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "run_id": {
                             "type": "string",
                             "description": "ID of the pipeline run to get logs for"
+                        },
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline (alternative to run_id)"
+                        },
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "ID of the pipeline (alternative to run_id)"
+                        },
+                        "run_number": {
+                            "type": "integer",
+                            "description": "Run number within the pipeline (1 = latest, 2 = second latest, etc.)",
+                            "minimum": 1
                         },
                         "lines": {
                             "type": "integer",
@@ -191,7 +249,11 @@ impl PlmToolProvider {
                             "description": "Show logs since timestamp (ISO format)"
                         }
                     },
-                    "required": ["run_id"]
+                    "anyOf": [
+                        {"required": ["run_id"]},
+                        {"required": ["pipeline_name", "run_number"]},
+                        {"required": ["pipeline_id", "run_number"]}
+                    ]
                 }),
             },
             Tool {
@@ -244,16 +306,33 @@ impl PlmToolProvider {
             },
             Tool {
                 name: "plm_get_run_events".to_string(),
-                description: "Get events for a specific pipeline run".to_string(),
+                description: "Get events for a specific pipeline run by ID or pipeline name/run number".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "run_id": {
                             "type": "string",
                             "description": "ID of the pipeline run to get events for"
+                        },
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline (alternative to run_id)"
+                        },
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "ID of the pipeline (alternative to run_id)"
+                        },
+                        "run_number": {
+                            "type": "integer",
+                            "description": "Run number within the pipeline (1 = latest, 2 = second latest, etc.)",
+                            "minimum": 1
                         }
                     },
-                    "required": ["run_id"]
+                    "anyOf": [
+                        {"required": ["run_id"]},
+                        {"required": ["pipeline_name", "run_number"]},
+                        {"required": ["pipeline_id", "run_number"]}
+                    ]
                 }),
             },
             
@@ -292,6 +371,7 @@ impl PlmToolProvider {
             "plm_get_pipeline" => self.get_pipeline(args).await,
             "plm_start_pipeline" => self.start_pipeline(args).await,
             "plm_cancel_run" => self.cancel_run(args).await,
+            "plm_resolve_run_id" => self.resolve_run_id(args).await,
             "plm_list_runs" => self.list_runs(args).await,
             "plm_get_run" => self.get_run(args).await,
             "plm_get_run_log" => self.get_run_log(args).await,
@@ -557,11 +637,9 @@ impl PlmToolProvider {
     }
 
     async fn get_run(&self, args: Value) -> Result<Vec<Content>> {
-        let run_id = args.get("run_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
+        let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        match self.cli_manager.execute(&["plm", "run", "get", run_id, "--output", "json"], None).await {
+        match self.cli_manager.execute(&["plm", "run", "get", &run_id, "--output", "json"], None).await {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -590,11 +668,9 @@ impl PlmToolProvider {
     }
 
     async fn get_run_log(&self, args: Value) -> Result<Vec<Content>> {
-        let run_id = args.get("run_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
+        let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        let mut cli_args = vec!["plm", "run", "log", run_id, "--output", "json"];
+        let mut cli_args = vec!["plm", "run", "log", &run_id, "--output", "json"];
         
         // Build CLI arguments based on filtering parameters
         let mut additional_args = Vec::new();
@@ -664,11 +740,9 @@ impl PlmToolProvider {
     }
 
     async fn get_run_events(&self, args: Value) -> Result<Vec<Content>> {
-        let run_id = args.get("run_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
+        let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        match self.cli_manager.execute(&["plm", "run", "events", run_id, "--output", "json"], None).await {
+        match self.cli_manager.execute(&["plm", "run", "events", &run_id, "--output", "json"], None).await {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -969,5 +1043,127 @@ impl PlmToolProvider {
         }
         
         json!(patterns)
+    }
+
+    /// Resolve run ID from pipeline name/ID and run number
+    async fn resolve_run_id(&self, args: Value) -> Result<Vec<Content>> {
+        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+            name.to_string()
+        } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+            id.to_string()
+        } else {
+            return Err(StudioError::InvalidOperation("Either pipeline_name or pipeline_id is required".to_string()));
+        };
+
+        let run_number = args.get("run_number")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| StudioError::InvalidOperation("run_number is required".to_string()))? as usize;
+
+        // Get runs for the pipeline
+        let cli_args = vec!["plm", "run", "list", "--pipeline", &pipeline_filter, "--output", "json"];
+        
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                if let Some(runs) = result.as_array() {
+                    if run_number == 0 || run_number > runs.len() {
+                        let error_response = json!({
+                            "success": false,
+                            "error": format!("Run number {} is out of range (1-{})", run_number, runs.len()),
+                            "pipeline": pipeline_filter,
+                            "available_runs": runs.len()
+                        });
+                        return Ok(vec![Content::Text {
+                            text: serde_json::to_string_pretty(&error_response)?,
+                        }]);
+                    }
+
+                    // Get the run by index (run_number 1 = index 0 = latest)
+                    let run = &runs[run_number - 1];
+                    let run_id = run.get("id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| StudioError::InvalidOperation("Run ID not found in response".to_string()))?;
+
+                    let response = json!({
+                        "success": true,
+                        "run_id": run_id,
+                        "pipeline": pipeline_filter,
+                        "run_number": run_number,
+                        "run_details": run
+                    });
+
+                    Ok(vec![Content::Text {
+                        text: serde_json::to_string_pretty(&response)?,
+                    }])
+                } else {
+                    let error_response = json!({
+                        "success": false,
+                        "error": "Invalid response format from CLI",
+                        "pipeline": pipeline_filter
+                    });
+                    Ok(vec![Content::Text {
+                        text: serde_json::to_string_pretty(&error_response)?,
+                    }])
+                }
+            }
+            Err(e) => {
+                error!("Failed to list runs for pipeline {}: {}", pipeline_filter, e);
+                let error_response = json!({
+                    "success": false,
+                    "pipeline": pipeline_filter,
+                    "error": e.to_string(),
+                    "message": "Failed to retrieve runs for pipeline"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    /// Helper to resolve run ID from various input formats
+    async fn resolve_run_id_from_args(&self, args: &Value) -> Result<String> {
+        // If run_id is provided directly, use it
+        if let Some(run_id) = args.get("run_id").and_then(|v| v.as_str()) {
+            return Ok(run_id.to_string());
+        }
+
+        // Otherwise, resolve from pipeline name/ID and run number
+        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+            name.to_string()
+        } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+            id.to_string()
+        } else {
+            return Err(StudioError::InvalidOperation("Either run_id or (pipeline_name/pipeline_id + run_number) is required".to_string()));
+        };
+
+        let run_number = args.get("run_number")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| StudioError::InvalidOperation("run_number is required when not using run_id".to_string()))? as usize;
+
+        // Get runs for the pipeline
+        let cli_args = vec!["plm", "run", "list", "--pipeline", &pipeline_filter, "--output", "json"];
+        
+        let result = self.cli_manager.execute(&cli_args, None).await?;
+        
+        if let Some(runs) = result.as_array() {
+            if run_number == 0 || run_number > runs.len() {
+                return Err(StudioError::InvalidOperation(format!(
+                    "Run number {} is out of range (1-{})", 
+                    run_number, 
+                    runs.len()
+                )));
+            }
+
+            // Get the run by index (run_number 1 = index 0 = latest)
+            let run = &runs[run_number - 1];
+            let run_id = run.get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| StudioError::InvalidOperation("Run ID not found in response".to_string()))?;
+
+            Ok(run_id.to_string())
+        } else {
+            Err(StudioError::InvalidOperation("Invalid response format from CLI".to_string()))
+        }
     }
 }
