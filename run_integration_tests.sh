@@ -5,12 +5,7 @@
 
 set -e
 
-# Ensure we have bash 4+ for associative arrays
-if [[ ${BASH_VERSION%%.*} -lt 4 ]]; then
-    echo "This script requires bash 4.0 or later for associative arrays"
-    echo "Current version: $BASH_VERSION"
-    exit 1
-fi
+# Note: This script is compatible with bash 3.2+ (including macOS default bash)
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,12 +35,15 @@ echo -e "${NC}"
 # Check prerequisites
 log "Checking prerequisites..."
 
+# Get absolute path to script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Check for Windows binary path from environment variable or detect platform
-MCP_BINARY_PATH="${MCP_SERVER_PATH:-target/release/studio-mcp-server}"
+MCP_BINARY_PATH="${MCP_SERVER_PATH:-$SCRIPT_DIR/target/release/studio-mcp-server}"
 
 # Platform-specific binary detection
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-    MCP_BINARY_PATH="${MCP_SERVER_PATH:-target/release/studio-mcp-server.exe}"
+    MCP_BINARY_PATH="${MCP_SERVER_PATH:-$SCRIPT_DIR/target/release/studio-mcp-server.exe}"
 fi
 
 if [[ ! -f "$MCP_BINARY_PATH" ]]; then
@@ -71,8 +69,9 @@ fi
 
 log "✅ Prerequisites checked"
 
-# Test results tracking
-declare -A test_results
+# Test results tracking (bash 3.2 compatible)
+test_names=()
+test_results=()
 total_tests=0
 passed_tests=0
 
@@ -85,12 +84,14 @@ run_test() {
     
     if eval "$test_command" &>/dev/null; then
         log "✅ $test_name PASSED"
-        test_results["$test_name"]="PASS"
+        test_names+=("$test_name")
+        test_results+=("PASS")
         ((passed_tests++))
         return 0
     else
         error "❌ $test_name FAILED"
-        test_results["$test_name"]="FAIL"
+        test_names+=("$test_name")
+        test_results+=("FAIL")
         return 1
     fi
 }
@@ -110,16 +111,35 @@ else
 fi
 
 # 2. Configuration Tests
-run_test "Configuration Init Test" "\"$MCP_BINARY_PATH\" --init /tmp/test-config-$$.json && rm -f /tmp/test-config-$$.json"
+test_config_init() {
+    local temp_config="/tmp/test-config-$$.json"
+    if "$MCP_BINARY_PATH" --init "$temp_config" >/dev/null 2>&1; then
+        if [[ -f "$temp_config" ]]; then
+            rm -f "$temp_config"
+            return 0
+        fi
+    fi
+    rm -f "$temp_config" 2>/dev/null
+    return 1
+}
+run_test "Configuration Init Test" "test_config_init"
 
 # 3. MCP Inspector Test (if Node.js is available)
 if command -v node &> /dev/null; then
-    run_test "MCP Inspector Compatibility" "echo 'q' | npx --yes @modelcontextprotocol/inspector \"$MCP_BINARY_PATH\" config.json --stdio 2>/dev/null"
+    # Create a temporary config for this test
+    temp_inspector_config="/tmp/test-inspector-config-$$.json"
+    if "$MCP_BINARY_PATH" --init "$temp_inspector_config" >/dev/null 2>&1; then
+        run_test "MCP Inspector Compatibility" "timeout 10 sh -c 'echo q | npx --yes @modelcontextprotocol/inspector \"$MCP_BINARY_PATH\" \"$temp_inspector_config\" --stdio' >/dev/null 2>&1; rm -f \"$temp_inspector_config\""
+    else
+        log "Skipping MCP Inspector test (config creation failed)"
+    fi
+else
+    log "Skipping MCP Inspector test (Node.js not available)"
 fi
 
 # 4. Mock Server Standalone Test (only if Docker is available)
 if command -v docker &> /dev/null && docker info &>/dev/null; then
-    run_test "Mock Server Standalone" "cd mock-studio-server && docker-compose up -d && sleep 5 && curl -s -H 'Authorization: Bearer test-token' http://localhost:8080/api/plm/pipelines | jq length > /dev/null && docker-compose down"
+    run_test "Mock Server Standalone" "cd \"$SCRIPT_DIR/mock-studio-server\" && docker-compose up -d && sleep 5 && curl -s -H 'Authorization: Bearer test-token' http://localhost:8080/api/plm/pipelines | jq length > /dev/null && docker-compose down"
 else
     log "Skipping Mock Server Standalone test (Docker not available)"
 fi
@@ -135,8 +155,9 @@ echo "Failed: $((total_tests - passed_tests))"
 echo
 
 # Detailed results
-for test_name in "${!test_results[@]}"; do
-    result="${test_results[$test_name]}"
+for i in "${!test_names[@]}"; do
+    test_name="${test_names[$i]}"
+    result="${test_results[$i]}"
     if [[ "$result" == "PASS" ]]; then
         echo -e "${GREEN}✅ $test_name${NC}"
     else

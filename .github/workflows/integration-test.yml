@@ -49,9 +49,12 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get update && sudo apt-get install -y jq
 
-    - name: Install jq (macOS)
+    - name: Install jq and bash (macOS)
       if: matrix.os == 'macos-latest'
-      run: brew install jq
+      run: |
+        brew install jq
+        # Use homebrew bash which supports newer features
+        brew install bash
 
     - name: Install jq (Windows)
       if: matrix.os == 'windows-latest'
@@ -103,10 +106,17 @@ jobs:
       run: |
         chmod +x run_integration_tests.sh
         chmod +x tests/integration/simple_integration_test.sh
+        chmod +x tests/integration/minimal_integration_test.sh
 
     - name: Run integration tests (Unix)
       if: matrix.os != 'windows-latest'
-      run: ./run_integration_tests.sh
+      run: |
+        # Use homebrew bash on macOS for better compatibility
+        if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          /opt/homebrew/bin/bash ./run_integration_tests.sh
+        else
+          ./run_integration_tests.sh
+        fi
       timeout-minutes: 15
 
     - name: Run integration tests (Windows)
