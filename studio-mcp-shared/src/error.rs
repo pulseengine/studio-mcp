@@ -67,14 +67,22 @@ impl From<StudioError> for Error {
     fn from(err: StudioError) -> Self {
         match err {
             StudioError::Cli(msg) => Error::internal_error(format!("CLI error: {}", msg)),
-            StudioError::Auth(msg) => Error::invalid_params(format!("Authentication error: {}", msg)),
+            StudioError::Auth(msg) => {
+                Error::invalid_params(format!("Authentication error: {}", msg))
+            }
             StudioError::Network(err) => Error::internal_error(format!("Network error: {}", err)),
             StudioError::Io(err) => Error::internal_error(format!("IO error: {}", err)),
             StudioError::Json(err) => Error::invalid_params(format!("JSON error: {}", err)),
-            StudioError::UrlParse(err) => Error::invalid_params(format!("URL parse error: {}", err)),
+            StudioError::UrlParse(err) => {
+                Error::invalid_params(format!("URL parse error: {}", err))
+            }
             StudioError::Mcp(msg) => Error::internal_error(msg),
-            StudioError::Config(msg) => Error::invalid_params(format!("Configuration error: {}", msg)),
-            StudioError::ResourceNotFound(msg) => Error::invalid_request(format!("Resource not found: {}", msg)),
+            StudioError::Config(msg) => {
+                Error::invalid_params(format!("Configuration error: {}", msg))
+            }
+            StudioError::ResourceNotFound(msg) => {
+                Error::invalid_request(format!("Resource not found: {}", msg))
+            }
             StudioError::InvalidOperation(msg) => Error::method_not_found(msg),
             StudioError::Timeout(msg) => Error::internal_error(format!("Timeout: {}", msg)),
             StudioError::ChecksumMismatch => Error::internal_error("Checksum verification failed"),

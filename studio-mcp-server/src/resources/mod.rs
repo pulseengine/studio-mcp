@@ -1,9 +1,9 @@
 //! Resource providers for WindRiver Studio MCP server
 
+use pulseengine_mcp_protocol::{Content, Resource};
 use std::sync::Arc;
-use pulseengine_mcp_protocol::{Resource, Content};
-use studio_mcp_shared::{StudioConfig, Result, StudioError, ResourceUri};
 use studio_cli_manager::CliManager;
+use studio_mcp_shared::{ResourceUri, Result, StudioConfig, StudioError};
 use tracing::{debug, warn};
 
 pub mod plm;
@@ -19,7 +19,7 @@ pub struct ResourceProvider {
 impl ResourceProvider {
     pub fn new(cli_manager: Arc<CliManager>, config: StudioConfig) -> Self {
         let plm_provider = PlmResourceProvider::new(cli_manager.clone(), config.clone());
-        
+
         Self {
             cli_manager,
             config,
@@ -64,24 +64,21 @@ impl ResourceProvider {
         debug!("Reading resource: {}", uri);
 
         let parsed_uri = ResourceUri::parse(uri)?;
-        
+
         match parsed_uri.path.first().map(|s| s.as_str()) {
-            Some("plm") => {
-                self.plm_provider.read_resource(&parsed_uri).await
-            }
-            Some("config") => {
-                self.read_config_resource(&parsed_uri).await
-            }
-            Some("status") => {
-                self.read_status_resource().await
-            }
+            Some("plm") => self.plm_provider.read_resource(&parsed_uri).await,
+            Some("config") => self.read_config_resource(&parsed_uri).await,
+            Some("status") => self.read_status_resource().await,
             None => {
                 // Root resource
                 self.read_root_resource().await
             }
             Some(service) => {
                 warn!("Unknown service area: {}", service);
-                Err(StudioError::ResourceNotFound(format!("Service '{}' not implemented", service)))
+                Err(StudioError::ResourceNotFound(format!(
+                    "Service '{}' not implemented",
+                    service
+                )))
             }
         }
     }
@@ -129,30 +126,28 @@ impl ResourceProvider {
         match uri.path.get(1).map(|s| s.as_str()) {
             Some("connections") => {
                 let content = serde_json::to_string_pretty(&self.config.connections)?;
-                Ok(vec![Content::Text {
-                    text: content,
-                }])
+                Ok(vec![Content::Text { text: content }])
             }
             Some("cli") => {
                 let content = serde_json::to_string_pretty(&self.config.cli)?;
-                Ok(vec![Content::Text {
-                    text: content,
-                }])
+                Ok(vec![Content::Text { text: content }])
             }
             None => {
                 let content = serde_json::to_string_pretty(&self.config)?;
-                Ok(vec![Content::Text {
-                    text: content,
-                }])
+                Ok(vec![Content::Text { text: content }])
             }
-            Some(config_type) => {
-                Err(StudioError::ResourceNotFound(format!("Config type '{}' not found", config_type)))
-            }
+            Some(config_type) => Err(StudioError::ResourceNotFound(format!(
+                "Config type '{}' not found",
+                config_type
+            ))),
         }
     }
 
     async fn read_status_resource(&self) -> Result<Vec<Content>> {
-        let cli_versions = self.cli_manager.list_installed_versions().unwrap_or_default();
+        let cli_versions = self
+            .cli_manager
+            .list_installed_versions()
+            .unwrap_or_default();
         let default_connection = self.config.get_default_connection();
 
         let content = serde_json::json!({

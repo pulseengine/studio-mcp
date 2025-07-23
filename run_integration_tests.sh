@@ -101,14 +101,14 @@ log "Running integration tests..."
 echo
 
 # 1. Simple Integration Test
-run_test "Simple Integration Test" "cd tests/integration && timeout 120s ./simple_integration_test.sh"
+run_test "Simple Integration Test" "cd tests/integration && ./simple_integration_test.sh"
 
 # 2. Configuration Tests
-run_test "Configuration Init Test" "timeout 10s \"$MCP_BINARY_PATH\" --init /tmp/test-config-$$.json && rm -f /tmp/test-config-$$.json"
+run_test "Configuration Init Test" "\"$MCP_BINARY_PATH\" --init /tmp/test-config-$$.json && rm -f /tmp/test-config-$$.json"
 
 # 3. MCP Inspector Test (if Node.js is available)
 if command -v node &> /dev/null; then
-    run_test "MCP Inspector Compatibility" "timeout 20s npx --yes @modelcontextprotocol/inspector \"$MCP_BINARY_PATH\" config.json --stdio </dev/null"
+    run_test "MCP Inspector Compatibility" "echo 'q' | npx --yes @modelcontextprotocol/inspector \"$MCP_BINARY_PATH\" config.json --stdio 2>/dev/null"
 fi
 
 # 4. Mock Server Standalone Test

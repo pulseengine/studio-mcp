@@ -1,11 +1,11 @@
 //! Token validation and JWT verification for WindRiver Studio
 
-use crate::{AuthToken, StudioError, Result};
-use serde::{Deserialize, Serialize};
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation, TokenData};
-use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
+use crate::{AuthToken, Result, StudioError};
+use chrono::{DateTime, Duration, Utc};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, TokenData, Validation};
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -145,13 +145,18 @@ impl TokenValidator {
         let decoding_key = match self.get_decoding_key(&token.studio_url, &header).await {
             Ok(key) => key,
             Err(e) => {
-                result.errors.push(format!("Failed to get decoding key: {}", e));
+                result
+                    .errors
+                    .push(format!("Failed to get decoding key: {}", e));
                 return Ok(result);
             }
         };
 
         // Validate JWT signature and claims
-        match self.decode_and_validate_jwt(&token.access_token, &decoding_key).await {
+        match self
+            .decode_and_validate_jwt(&token.access_token, &decoding_key)
+            .await
+        {
             Ok(token_data) => {
                 result.is_valid = true;
                 result.claims = Some(token_data.claims);
@@ -201,10 +206,14 @@ impl TokenValidator {
     }
 
     /// Validate token permissions for specific operations
-    pub fn validate_permissions(&self, claims: &StudioTokenClaims, required_scopes: &[String]) -> bool {
+    pub fn validate_permissions(
+        &self,
+        claims: &StudioTokenClaims,
+        required_scopes: &[String],
+    ) -> bool {
         if let Some(scope_str) = &claims.scope {
             let token_scopes: Vec<&str> = scope_str.split_whitespace().collect();
-            
+
             for required in required_scopes {
                 if !token_scopes.contains(&required.as_str()) {
                     return false;
@@ -218,7 +227,10 @@ impl TokenValidator {
 
     /// Validate token for specific Studio instance
     pub fn validate_instance(&self, claims: &StudioTokenClaims, expected_instance: &str) -> bool {
-        claims.instance_id.as_ref().map_or(false, |id| id == expected_instance)
+        claims
+            .instance_id
+            .as_ref()
+            .map_or(false, |id| id == expected_instance)
     }
 
     /// Get or fetch JWKS decoding key
@@ -254,8 +266,9 @@ impl TokenValidator {
     /// Fetch JWKS from Studio instance
     async fn fetch_jwks(&self, studio_url: &str) -> Result<JwksResponse> {
         let jwks_url = format!("{}/.well-known/jwks.json", studio_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&jwks_url)
             .timeout(std::time::Duration::from_secs(10))
             .send()
@@ -269,10 +282,7 @@ impl TokenValidator {
             )));
         }
 
-        let jwks: JwksResponse = response
-            .json()
-            .await
-            .map_err(|e| StudioError::Network(e))?;
+        let jwks: JwksResponse = response.json().await.map_err(|e| StudioError::Network(e))?;
 
         Ok(jwks)
     }
@@ -300,7 +310,9 @@ impl TokenValidator {
         }
 
         if keys.is_empty() {
-            return Err(StudioError::Auth("No valid RSA keys found in JWKS".to_string()));
+            return Err(StudioError::Auth(
+                "No valid RSA keys found in JWKS".to_string(),
+            ));
         }
 
         let entry = JwksEntry {
@@ -323,12 +335,12 @@ impl TokenValidator {
         // This is a simplified implementation
         // In production, you'd use proper RSA key construction from modulus and exponent
         // For now, return a dummy key since we don't have the full RSA implementation
-        
+
         // This would normally construct the RSA public key from n and e parameters
         // let modulus = base64url_decode(&jwk.n.as_ref().unwrap())?;
         // let exponent = base64url_decode(&jwk.e.as_ref().unwrap())?;
         // let public_key = construct_rsa_public_key(modulus, exponent)?;
-        
+
         // For now, create a dummy key
         Ok(DecodingKey::from_secret(b"dummy-secret-key"))
     }
@@ -376,7 +388,10 @@ impl ValidationResult {
     /// Get user information from claims
     pub fn get_user_info(&self) -> Option<(String, Vec<String>)> {
         self.claims.as_ref().map(|claims| {
-            let username = claims.username.clone().unwrap_or_else(|| claims.sub.clone());
+            let username = claims
+                .username
+                .clone()
+                .unwrap_or_else(|| claims.sub.clone());
             let roles = claims.roles.clone().unwrap_or_default();
             (username, roles)
         })
@@ -400,7 +415,7 @@ mod tests {
     #[test]
     fn test_basic_token_validation() {
         let validator = TokenValidator::new();
-        
+
         // Create a valid token
         let token = AuthToken::new(
             "valid.jwt.token".to_string(),
@@ -418,7 +433,7 @@ mod tests {
     #[test]
     fn test_expired_token_validation() {
         let validator = TokenValidator::new();
-        
+
         // Create an expired token
         let token = AuthToken::new(
             "expired.jwt.token".to_string(),
@@ -436,7 +451,7 @@ mod tests {
     #[test]
     fn test_token_needs_refresh() {
         let validator = TokenValidator::new();
-        
+
         // Create a token that expires in 2 minutes (should need refresh)
         let token = AuthToken::new(
             "soon.to.expire.token".to_string(),
@@ -452,7 +467,7 @@ mod tests {
     #[test]
     fn test_permission_validation() {
         let validator = TokenValidator::new();
-        
+
         let claims = StudioTokenClaims {
             sub: "user123".to_string(),
             exp: 9999999999,
@@ -469,7 +484,7 @@ mod tests {
         // Test valid permissions
         assert!(validator.validate_permissions(&claims, &["read".to_string()]));
         assert!(validator.validate_permissions(&claims, &["read".to_string(), "write".to_string()]));
-        
+
         // Test invalid permissions
         assert!(!validator.validate_permissions(&claims, &["super-admin".to_string()]));
     }

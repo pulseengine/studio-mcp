@@ -1,10 +1,10 @@
 //! PLM (Pipeline Management) tool provider
 
+use pulseengine_mcp_protocol::{Content, Tool};
+use serde_json::{json, Value};
 use std::sync::Arc;
-use pulseengine_mcp_protocol::{Tool, Content};
-use studio_mcp_shared::{StudioConfig, Result, StudioError};
 use studio_cli_manager::CliManager;
-use serde_json::{Value, json};
+use studio_mcp_shared::{Result, StudioConfig, StudioError};
 use tracing::{debug, error};
 
 pub struct PlmToolProvider {
@@ -88,7 +88,7 @@ impl PlmToolProvider {
                             }
                         },
                         "config": {
-                            "type": "array", 
+                            "type": "array",
                             "description": "Pipeline config settings as key=value pairs",
                             "items": {
                                 "type": "string",
@@ -97,7 +97,7 @@ impl PlmToolProvider {
                         },
                         "env": {
                             "type": "array",
-                            "description": "Environment variables as key=value pairs", 
+                            "description": "Environment variables as key=value pairs",
                             "items": {
                                 "type": "string",
                                 "pattern": "^[^=]+=.*$"
@@ -125,7 +125,7 @@ impl PlmToolProvider {
                     "required": ["run_id"]
                 }),
             },
-            
+
             // ID resolution tool
             Tool {
                 name: "plm_resolve_run_id".to_string(),
@@ -153,7 +153,7 @@ impl PlmToolProvider {
                     ]
                 }),
             },
-            
+
             // Pipeline run management tools
             Tool {
                 name: "plm_list_runs".to_string(),
@@ -166,7 +166,7 @@ impl PlmToolProvider {
                             "description": "Filter runs by pipeline name"
                         },
                         "pipeline_id": {
-                            "type": "string", 
+                            "type": "string",
                             "description": "Filter runs by pipeline ID"
                         }
                     },
@@ -335,7 +335,7 @@ impl PlmToolProvider {
                     ]
                 }),
             },
-            
+
             // Resource management tools
             Tool {
                 name: "plm_list_resources".to_string(),
@@ -362,7 +362,10 @@ impl PlmToolProvider {
     }
 
     pub async fn call_tool(&self, name: &str, arguments: Option<Value>) -> Result<Vec<Content>> {
-        debug!("PLM provider calling tool: {} with args: {:?}", name, arguments);
+        debug!(
+            "PLM provider calling tool: {} with args: {:?}",
+            name, arguments
+        );
 
         let args = arguments.unwrap_or(Value::Object(serde_json::Map::new()));
 
@@ -381,35 +384,38 @@ impl PlmToolProvider {
             "plm_get_task_errors" => self.get_task_errors(args).await,
             _ => {
                 error!("Unknown PLM tool: {}", name);
-                Err(StudioError::InvalidOperation(format!("PLM tool '{}' not found", name)))
+                Err(StudioError::InvalidOperation(format!(
+                    "PLM tool '{}' not found",
+                    name
+                )))
             }
         }
     }
 
     async fn list_pipelines(&self, args: Value) -> Result<Vec<Content>> {
         let mut cli_args = vec!["plm", "pipeline", "list", "--output", "json"];
-        
+
         // Add optional filters
         let mut name_filter = None;
         let mut user_filter = None;
         let mut limit_str = String::new();
         let mut offset_str = String::new();
-        
+
         if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--name", name]);
             name_filter = Some(name);
         }
-        
+
         if let Some(user) = args.get("user").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--user", user]);
             user_filter = Some(user);
         }
-        
+
         if let Some(limit) = args.get("limit").and_then(|v| v.as_u64()) {
             limit_str = limit.to_string();
             cli_args.extend_from_slice(&["--limit", &limit_str]);
         }
-        
+
         if let Some(offset) = args.get("offset").and_then(|v| v.as_u64()) {
             offset_str = offset.to_string();
             cli_args.extend_from_slice(&["--offset", &offset_str]);
@@ -448,11 +454,19 @@ impl PlmToolProvider {
     }
 
     async fn get_pipeline(&self, args: Value) -> Result<Vec<Content>> {
-        let pipeline_id = args.get("pipeline_id")
+        let pipeline_id = args
+            .get("pipeline_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| StudioError::InvalidOperation("pipeline_id is required".to_string()))?;
 
-        match self.cli_manager.execute(&["plm", "pipeline", "get", pipeline_id, "--output", "yaml"], None).await {
+        match self
+            .cli_manager
+            .execute(
+                &["plm", "pipeline", "get", pipeline_id, "--output", "yaml"],
+                None,
+            )
+            .await
+        {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -483,18 +497,21 @@ impl PlmToolProvider {
 
     async fn start_pipeline(&self, args: Value) -> Result<Vec<Content>> {
         let mut cli_args = vec!["plm", "run", "start", "--output", "json"];
-        
+
         // Either pipeline name or ID is required
-        let pipeline_identifier = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
-            cli_args.extend_from_slice(&["--name", name]);
-            name
-        } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
-            cli_args.extend_from_slice(&["--id", id]);
-            id
-        } else {
-            return Err(StudioError::InvalidOperation("Either pipeline_name or pipeline_id is required".to_string()));
-        };
-        
+        let pipeline_identifier =
+            if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--name", name]);
+                name
+            } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--id", id]);
+                id
+            } else {
+                return Err(StudioError::InvalidOperation(
+                    "Either pipeline_name or pipeline_id is required".to_string(),
+                ));
+            };
+
         // Add parameters if provided
         if let Some(parameters) = args.get("parameters").and_then(|v| v.as_array()) {
             for param in parameters {
@@ -503,7 +520,7 @@ impl PlmToolProvider {
                 }
             }
         }
-        
+
         // Add config settings if provided
         if let Some(config) = args.get("config").and_then(|v| v.as_array()) {
             for conf in config {
@@ -512,7 +529,7 @@ impl PlmToolProvider {
                 }
             }
         }
-        
+
         // Add environment variables if provided
         if let Some(env) = args.get("env").and_then(|v| v.as_array()) {
             for env_var in env {
@@ -521,9 +538,13 @@ impl PlmToolProvider {
                 }
             }
         }
-        
+
         // Add follow flag if requested
-        if args.get("follow").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if args
+            .get("follow")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
             cli_args.push("--follow");
         }
 
@@ -561,11 +582,16 @@ impl PlmToolProvider {
     }
 
     async fn cancel_run(&self, args: Value) -> Result<Vec<Content>> {
-        let run_id = args.get("run_id")
+        let run_id = args
+            .get("run_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
 
-        match self.cli_manager.execute(&["plm", "run", "cancel", run_id, "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "run", "cancel", run_id, "--output", "json"], None)
+            .await
+        {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -597,9 +623,10 @@ impl PlmToolProvider {
 
     async fn list_runs(&self, args: Value) -> Result<Vec<Content>> {
         let mut cli_args = vec!["plm", "run", "list", "--output", "json"];
-        
+
         // Add pipeline filter if provided
-        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str())
+        {
             cli_args.extend_from_slice(&["--pipeline", name]);
             Some(format!("name: {}", name))
         } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
@@ -639,7 +666,11 @@ impl PlmToolProvider {
     async fn get_run(&self, args: Value) -> Result<Vec<Content>> {
         let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        match self.cli_manager.execute(&["plm", "run", "get", &run_id, "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "run", "get", &run_id, "--output", "json"], None)
+            .await
+        {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -671,24 +702,24 @@ impl PlmToolProvider {
         let run_id = self.resolve_run_id_from_args(&args).await?;
 
         let mut cli_args = vec!["plm", "run", "log", &run_id, "--output", "json"];
-        
+
         // Build CLI arguments based on filtering parameters
         let mut additional_args = Vec::new();
-        
+
         if let Some(lines) = args.get("lines").and_then(|v| v.as_u64()) {
             additional_args.push("--lines".to_string());
             additional_args.push(lines.to_string());
         }
-        
+
         if args.get("tail").and_then(|v| v.as_bool()).unwrap_or(false) {
             additional_args.push("--tail".to_string());
         }
-        
+
         if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
             additional_args.push("--task".to_string());
             additional_args.push(task_name.to_string());
         }
-        
+
         if let Some(since) = args.get("since").and_then(|v| v.as_str()) {
             additional_args.push("--since".to_string());
             additional_args.push(since.to_string());
@@ -702,7 +733,11 @@ impl PlmToolProvider {
         match self.cli_manager.execute(&cli_args, None).await {
             Ok(mut result) => {
                 // Apply client-side error filtering if requested
-                if args.get("errors_only").and_then(|v| v.as_bool()).unwrap_or(false) {
+                if args
+                    .get("errors_only")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
                     result = self.filter_error_logs(result);
                 }
 
@@ -742,7 +777,11 @@ impl PlmToolProvider {
     async fn get_run_events(&self, args: Value) -> Result<Vec<Content>> {
         let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        match self.cli_manager.execute(&["plm", "run", "events", &run_id, "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "run", "events", &run_id, "--output", "json"], None)
+            .await
+        {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -772,15 +811,15 @@ impl PlmToolProvider {
 
     async fn list_resources(&self, args: Value) -> Result<Vec<Content>> {
         let mut cli_args = vec!["plm", "resource", "list", "--output", "json"];
-        
+
         // Add filters if provided
         let mut filters = json!({});
-        
+
         if let Some(pipeline) = args.get("pipeline").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--pipeline", pipeline]);
             filters["pipeline"] = json!(pipeline);
         }
-        
+
         if let Some(access_config) = args.get("access_config").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--access-config", access_config]);
             filters["access_config"] = json!(access_config);
@@ -815,23 +854,45 @@ impl PlmToolProvider {
 
     async fn get_pipeline_errors(&self, args: Value) -> Result<Vec<Content>> {
         // Get pipeline identifier
-        let pipeline_identifier = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
-            name
-        } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
-            id
-        } else {
-            return Err(StudioError::InvalidOperation("Either pipeline_name or pipeline_id is required".to_string()));
-        };
+        let pipeline_identifier =
+            if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+                name
+            } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+                id
+            } else {
+                return Err(StudioError::InvalidOperation(
+                    "Either pipeline_name or pipeline_id is required".to_string(),
+                ));
+            };
 
-        let recent_runs = args.get("recent_runs")
+        let recent_runs = args
+            .get("recent_runs")
             .and_then(|v| v.as_u64())
             .unwrap_or(5) as usize;
 
         // Get recent runs for this pipeline
-        let runs_result = match self.cli_manager.execute(&["plm", "run", "list", "--pipeline", pipeline_identifier, "--output", "json"], None).await {
+        let runs_result = match self
+            .cli_manager
+            .execute(
+                &[
+                    "plm",
+                    "run",
+                    "list",
+                    "--pipeline",
+                    pipeline_identifier,
+                    "--output",
+                    "json",
+                ],
+                None,
+            )
+            .await
+        {
             Ok(result) => result,
             Err(e) => {
-                error!("Failed to get runs for pipeline {}: {}", pipeline_identifier, e);
+                error!(
+                    "Failed to get runs for pipeline {}: {}",
+                    pipeline_identifier, e
+                );
                 return Ok(vec![Content::Text {
                     text: serde_json::to_string_pretty(&json!({
                         "success": false,
@@ -859,21 +920,31 @@ impl PlmToolProvider {
             for run in limited_runs {
                 if let Some(run_id) = run.get("id").and_then(|v| v.as_str()) {
                     // Get logs for this run and analyze errors
-                    if let Ok(log_result) = self.cli_manager.execute(&["plm", "run", "log", run_id, "--output", "json"], None).await {
+                    if let Ok(log_result) = self
+                        .cli_manager
+                        .execute(&["plm", "run", "log", run_id, "--output", "json"], None)
+                        .await
+                    {
                         let filtered_errors = self.filter_error_logs(log_result);
-                        
+
                         // Count and categorize errors (simplified implementation)
                         if let Some(log_text) = filtered_errors.as_str() {
-                            let error_count = log_text.lines()
-                                .filter(|line| line.to_lowercase().contains("error") || line.to_lowercase().contains("fail"))
+                            let error_count = log_text
+                                .lines()
+                                .filter(|line| {
+                                    line.to_lowercase().contains("error")
+                                        || line.to_lowercase().contains("fail")
+                                })
                                 .count();
-                            
+
                             error_summary["total_errors"] = json!(
-                                error_summary["total_errors"].as_u64().unwrap_or(0) + error_count as u64
+                                error_summary["total_errors"].as_u64().unwrap_or(0)
+                                    + error_count as u64
                             );
 
                             if error_count > 0 {
-                                let recent_errors = error_summary["recent_errors"].as_array_mut().unwrap();
+                                let recent_errors =
+                                    error_summary["recent_errors"].as_array_mut().unwrap();
                                 recent_errors.push(json!({
                                     "run_id": run_id,
                                     "error_count": error_count,
@@ -895,21 +966,26 @@ impl PlmToolProvider {
     }
 
     async fn get_task_errors(&self, args: Value) -> Result<Vec<Content>> {
-        let run_id = args.get("run_id")
+        let run_id = args
+            .get("run_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| StudioError::InvalidOperation("run_id is required".to_string()))?;
 
-        let task_name = args.get("task_name")
+        let task_name = args
+            .get("task_name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| StudioError::InvalidOperation("task_name is required".to_string()))?;
 
-        let context_lines = args.get("context_lines")
+        let context_lines = args
+            .get("context_lines")
             .and_then(|v| v.as_u64())
             .unwrap_or(10);
 
         // Get logs for the specific task
-        let mut cli_args = vec!["plm", "run", "log", run_id, "--task", task_name, "--output", "json"];
-        
+        let mut cli_args = vec![
+            "plm", "run", "log", run_id, "--task", task_name, "--output", "json",
+        ];
+
         // Add context lines if the CLI supports it
         let context_str = context_lines.to_string();
         cli_args.extend_from_slice(&["--lines", &context_str]);
@@ -932,7 +1008,10 @@ impl PlmToolProvider {
                 }])
             }
             Err(e) => {
-                error!("Failed to get task errors for run {} task {}: {}", run_id, task_name, e);
+                error!(
+                    "Failed to get task errors for run {} task {}: {}",
+                    run_id, task_name, e
+                );
                 let error_response = json!({
                     "success": false,
                     "run_id": run_id,
@@ -955,15 +1034,15 @@ impl PlmToolProvider {
                 .lines()
                 .filter(|line| {
                     let lower = line.to_lowercase();
-                    lower.contains("error") || 
-                    lower.contains("fail") || 
-                    lower.contains("exception") ||
-                    lower.contains("panic") ||
-                    lower.contains("fatal") ||
-                    lower.contains("warn")
+                    lower.contains("error")
+                        || lower.contains("fail")
+                        || lower.contains("exception")
+                        || lower.contains("panic")
+                        || lower.contains("fatal")
+                        || lower.contains("warn")
                 })
                 .collect();
-            
+
             json!(error_lines.join("\n"))
         } else {
             logs
@@ -977,11 +1056,12 @@ impl PlmToolProvider {
 
             for (i, line) in lines.iter().enumerate() {
                 let lower = line.to_lowercase();
-                if lower.contains("error") || lower.contains("fail") || lower.contains("exception") {
+                if lower.contains("error") || lower.contains("fail") || lower.contains("exception")
+                {
                     // Get context around error
                     let start = i.saturating_sub(context_lines);
                     let end = std::cmp::min(i + context_lines + 1, lines.len());
-                    
+
                     let context_block: Vec<String> = lines[start..end]
                         .iter()
                         .enumerate()
@@ -1022,11 +1102,11 @@ impl PlmToolProvider {
 
     fn extract_error_patterns(&self, error_blocks: &[Value]) -> Value {
         let mut patterns = std::collections::HashMap::new();
-        
+
         for block in error_blocks {
             if let Some(error_text) = block.get("error_text").and_then(|v| v.as_str()) {
                 let lower = error_text.to_lowercase();
-                
+
                 // Simple pattern matching
                 if lower.contains("connection") || lower.contains("network") {
                     *patterns.entry("network_errors").or_insert(0) += 1;
@@ -1041,27 +1121,40 @@ impl PlmToolProvider {
                 }
             }
         }
-        
+
         json!(patterns)
     }
 
     /// Resolve run ID from pipeline name/ID and run number
     async fn resolve_run_id(&self, args: Value) -> Result<Vec<Content>> {
-        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str())
+        {
             name.to_string()
         } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
             id.to_string()
         } else {
-            return Err(StudioError::InvalidOperation("Either pipeline_name or pipeline_id is required".to_string()));
+            return Err(StudioError::InvalidOperation(
+                "Either pipeline_name or pipeline_id is required".to_string(),
+            ));
         };
 
-        let run_number = args.get("run_number")
+        let run_number = args
+            .get("run_number")
             .and_then(|v| v.as_u64())
-            .ok_or_else(|| StudioError::InvalidOperation("run_number is required".to_string()))? as usize;
+            .ok_or_else(|| StudioError::InvalidOperation("run_number is required".to_string()))?
+            as usize;
 
         // Get runs for the pipeline
-        let cli_args = vec!["plm", "run", "list", "--pipeline", &pipeline_filter, "--output", "json"];
-        
+        let cli_args = vec![
+            "plm",
+            "run",
+            "list",
+            "--pipeline",
+            &pipeline_filter,
+            "--output",
+            "json",
+        ];
+
         match self.cli_manager.execute(&cli_args, None).await {
             Ok(result) => {
                 if let Some(runs) = result.as_array() {
@@ -1079,9 +1172,9 @@ impl PlmToolProvider {
 
                     // Get the run by index (run_number 1 = index 0 = latest)
                     let run = &runs[run_number - 1];
-                    let run_id = run.get("id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| StudioError::InvalidOperation("Run ID not found in response".to_string()))?;
+                    let run_id = run.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
+                        StudioError::InvalidOperation("Run ID not found in response".to_string())
+                    })?;
 
                     let response = json!({
                         "success": true,
@@ -1106,7 +1199,10 @@ impl PlmToolProvider {
                 }
             }
             Err(e) => {
-                error!("Failed to list runs for pipeline {}: {}", pipeline_filter, e);
+                error!(
+                    "Failed to list runs for pipeline {}: {}",
+                    pipeline_filter, e
+                );
                 let error_response = json!({
                     "success": false,
                     "pipeline": pipeline_filter,
@@ -1129,41 +1225,59 @@ impl PlmToolProvider {
         }
 
         // Otherwise, resolve from pipeline name/ID and run number
-        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str())
+        {
             name.to_string()
         } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
             id.to_string()
         } else {
-            return Err(StudioError::InvalidOperation("Either run_id or (pipeline_name/pipeline_id + run_number) is required".to_string()));
+            return Err(StudioError::InvalidOperation(
+                "Either run_id or (pipeline_name/pipeline_id + run_number) is required".to_string(),
+            ));
         };
 
-        let run_number = args.get("run_number")
+        let run_number = args
+            .get("run_number")
             .and_then(|v| v.as_u64())
-            .ok_or_else(|| StudioError::InvalidOperation("run_number is required when not using run_id".to_string()))? as usize;
+            .ok_or_else(|| {
+                StudioError::InvalidOperation(
+                    "run_number is required when not using run_id".to_string(),
+                )
+            })? as usize;
 
         // Get runs for the pipeline
-        let cli_args = vec!["plm", "run", "list", "--pipeline", &pipeline_filter, "--output", "json"];
-        
+        let cli_args = vec![
+            "plm",
+            "run",
+            "list",
+            "--pipeline",
+            &pipeline_filter,
+            "--output",
+            "json",
+        ];
+
         let result = self.cli_manager.execute(&cli_args, None).await?;
-        
+
         if let Some(runs) = result.as_array() {
             if run_number == 0 || run_number > runs.len() {
                 return Err(StudioError::InvalidOperation(format!(
-                    "Run number {} is out of range (1-{})", 
-                    run_number, 
+                    "Run number {} is out of range (1-{})",
+                    run_number,
                     runs.len()
                 )));
             }
 
             // Get the run by index (run_number 1 = index 0 = latest)
             let run = &runs[run_number - 1];
-            let run_id = run.get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| StudioError::InvalidOperation("Run ID not found in response".to_string()))?;
+            let run_id = run.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
+                StudioError::InvalidOperation("Run ID not found in response".to_string())
+            })?;
 
             Ok(run_id.to_string())
         } else {
-            Err(StudioError::InvalidOperation("Invalid response format from CLI".to_string()))
+            Err(StudioError::InvalidOperation(
+                "Invalid response format from CLI".to_string(),
+            ))
         }
     }
 }

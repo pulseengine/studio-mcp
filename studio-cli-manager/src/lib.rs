@@ -10,9 +10,9 @@ pub use downloader::CliDownloader;
 pub use executor::CliExecutor;
 pub use version::VersionManager;
 
-use studio_mcp_shared::Result;
-use std::path::{Path, PathBuf};
 use directories::ProjectDirs;
+use std::path::{Path, PathBuf};
+use studio_mcp_shared::Result;
 
 /// Main CLI manager that orchestrates CLI operations
 pub struct CliManager {
@@ -49,7 +49,7 @@ impl CliManager {
         };
 
         let cli_path = self.get_cli_path(&target_version);
-        
+
         if !cli_path.exists() || self.version_manager.should_update(&target_version).await? {
             tracing::info!("Downloading/updating CLI version: {}", target_version);
             self.download_cli(&target_version).await?;
@@ -62,9 +62,11 @@ impl CliManager {
     pub async fn download_cli(&self, version: &str) -> Result<PathBuf> {
         let cli_version = self.version_manager.get_version_info(version).await?;
         let cli_path = self.get_cli_path(version);
-        
-        self.downloader.download_and_install(&cli_version, &cli_path).await?;
-        
+
+        self.downloader
+            .download_and_install(&cli_version, &cli_path)
+            .await?;
+
         // Make executable on Unix-like systems
         #[cfg(unix)]
         {
@@ -78,20 +80,26 @@ impl CliManager {
     }
 
     /// Execute a CLI command
-    pub async fn execute(&self, args: &[&str], working_dir: Option<&Path>) -> Result<serde_json::Value> {
+    pub async fn execute(
+        &self,
+        args: &[&str],
+        working_dir: Option<&Path>,
+    ) -> Result<serde_json::Value> {
         let cli_path = self.ensure_cli(None).await?;
         self.executor.execute(&cli_path, args, working_dir).await
     }
 
     /// Execute a CLI command with custom timeout
     pub async fn execute_with_timeout(
-        &self, 
-        args: &[&str], 
+        &self,
+        args: &[&str],
         working_dir: Option<&Path>,
         timeout_duration: std::time::Duration,
     ) -> Result<serde_json::Value> {
         let cli_path = self.ensure_cli(None).await?;
-        self.executor.execute_with_timeout(&cli_path, args, working_dir, timeout_duration).await
+        self.executor
+            .execute_with_timeout(&cli_path, args, working_dir, timeout_duration)
+            .await
     }
 
     /// Get the path where CLI should be installed for a given version
@@ -101,14 +109,14 @@ impl CliManager {
         } else {
             "studio-cli"
         };
-        
+
         self.install_dir.join(version).join(filename)
     }
 
     /// List installed CLI versions
     pub fn list_installed_versions(&self) -> Result<Vec<String>> {
         let mut versions = Vec::new();
-        
+
         if self.install_dir.exists() {
             for entry in std::fs::read_dir(&self.install_dir)? {
                 let entry = entry?;
@@ -122,7 +130,7 @@ impl CliManager {
                 }
             }
         }
-        
+
         versions.sort();
         Ok(versions)
     }
@@ -130,14 +138,14 @@ impl CliManager {
     /// Remove old CLI versions, keeping only the latest N versions
     pub fn cleanup_old_versions(&self, keep_count: usize) -> Result<()> {
         let mut versions = self.list_installed_versions()?;
-        
+
         if versions.len() <= keep_count {
             return Ok(());
         }
-        
+
         versions.sort();
         let to_remove = &versions[..versions.len() - keep_count];
-        
+
         for version in to_remove {
             let version_dir = self.install_dir.join(version);
             if version_dir.exists() {
@@ -145,7 +153,7 @@ impl CliManager {
                 std::fs::remove_dir_all(version_dir)?;
             }
         }
-        
+
         Ok(())
     }
 }

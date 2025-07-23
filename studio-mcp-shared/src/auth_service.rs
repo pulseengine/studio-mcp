@@ -1,10 +1,10 @@
 //! Authentication service that integrates with WindRiver Studio CLI
 
-use crate::{AuthManager, AuthCredentials, AuthToken, TokenStorage, StudioError, Result};
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
-use std::time::Duration;
+use crate::{AuthCredentials, AuthManager, AuthToken, Result, StudioError, TokenStorage};
 use jsonwebtoken::{decode_header, Algorithm, DecodingKey, Validation};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Studio authentication service
 pub struct StudioAuthService {
@@ -104,7 +104,9 @@ impl StudioAuthService {
     ) -> Result<AuthCredentials> {
         // Validate inputs
         if studio_url.is_empty() || username.is_empty() || password.is_empty() {
-            return Err(StudioError::Auth("Invalid authentication parameters".to_string()));
+            return Err(StudioError::Auth(
+                "Invalid authentication parameters".to_string(),
+            ));
         }
 
         // Normalize studio URL
@@ -114,7 +116,9 @@ impl StudioAuthService {
         self.verify_studio_instance(&normalized_url).await?;
 
         // Attempt authentication
-        let auth_response = self.perform_authentication(&normalized_url, username, password).await?;
+        let auth_response = self
+            .perform_authentication(&normalized_url, username, password)
+            .await?;
 
         // Parse and validate token
         let token = self.create_auth_token(auth_response, &normalized_url)?;
@@ -143,8 +147,14 @@ impl StudioAuthService {
     }
 
     /// Get cached credentials or load from storage
-    pub async fn get_credentials(&mut self, instance_id: &str, environment: &str) -> Result<AuthCredentials> {
-        let mut credentials = self.auth_manager.get_credentials(instance_id, environment)?;
+    pub async fn get_credentials(
+        &mut self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthCredentials> {
+        let mut credentials = self
+            .auth_manager
+            .get_credentials(instance_id, environment)?;
 
         // Check if token needs refresh
         if credentials.needs_refresh() {
@@ -155,11 +165,17 @@ impl StudioAuthService {
     }
 
     /// Refresh expired credentials
-    pub async fn refresh_credentials(&mut self, mut credentials: AuthCredentials) -> Result<AuthCredentials> {
+    pub async fn refresh_credentials(
+        &mut self,
+        mut credentials: AuthCredentials,
+    ) -> Result<AuthCredentials> {
         if let Some(token) = &credentials.token {
             if let Some(refresh_token) = &token.refresh_token {
                 // Attempt token refresh
-                match self.refresh_token_with_api(&credentials.studio_url, refresh_token).await {
+                match self
+                    .refresh_token_with_api(&credentials.studio_url, refresh_token)
+                    .await
+                {
                     Ok(new_token) => {
                         credentials.set_token(new_token);
                         self.auth_manager.store_credentials(&credentials).await?;
@@ -167,14 +183,17 @@ impl StudioAuthService {
                     }
                     Err(e) => {
                         // If refresh fails, credentials are invalid
-                        self.logout(&credentials.instance_id, &credentials.environment).await?;
+                        self.logout(&credentials.instance_id, &credentials.environment)
+                            .await?;
                         return Err(StudioError::Auth(format!("Token refresh failed: {}", e)));
                     }
                 }
             }
         }
 
-        Err(StudioError::Auth("Cannot refresh credentials - no refresh token available".to_string()))
+        Err(StudioError::Auth(
+            "Cannot refresh credentials - no refresh token available".to_string(),
+        ))
     }
 
     /// Logout and remove stored credentials
@@ -183,7 +202,9 @@ impl StudioAuthService {
         if let Ok(credentials) = self.auth_manager.get_credentials(instance_id, environment) {
             if let Ok(token) = credentials.get_valid_token() {
                 // Attempt to revoke token on server (best effort)
-                let _ = self.revoke_token(&credentials.studio_url, &token.access_token).await;
+                let _ = self
+                    .revoke_token(&credentials.studio_url, &token.access_token)
+                    .await;
             }
         }
 
@@ -204,8 +225,9 @@ impl StudioAuthService {
     /// Verify that a Studio instance is reachable
     pub async fn verify_studio_instance(&self, studio_url: &str) -> Result<()> {
         let health_url = format!("{}/api/health", studio_url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&health_url)
             .timeout(Duration::from_secs(10))
             .send()
@@ -230,7 +252,7 @@ impl StudioAuthService {
         password: &str,
     ) -> Result<AuthResponse> {
         let auth_url = format!("{}/api/auth/token", studio_url);
-        
+
         let request = AuthRequest {
             username: username.to_string(),
             password: password.to_string(),
@@ -238,7 +260,8 @@ impl StudioAuthService {
             client_id: "studio-mcp-client".to_string(),
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&auth_url)
             .json(&request)
             .send()
@@ -246,19 +269,18 @@ impl StudioAuthService {
             .map_err(|e| StudioError::Network(e))?;
 
         if response.status().is_success() {
-            let auth_response: AuthResponse = response
-                .json()
-                .await
-                .map_err(|e| StudioError::Network(e))?;
-            
+            let auth_response: AuthResponse =
+                response.json().await.map_err(|e| StudioError::Network(e))?;
+
             Ok(auth_response)
         } else {
             // Save status for error message
             let status = response.status();
-            
+
             // Try to parse error response
             let error_text = if let Ok(error_response) = response.json::<ApiErrorResponse>().await {
-                error_response.error_description
+                error_response
+                    .error_description
                     .unwrap_or_else(|| error_response.error)
             } else {
                 format!("Authentication failed with status: {}", status)
@@ -269,14 +291,19 @@ impl StudioAuthService {
     }
 
     /// Refresh token using Studio API
-    async fn refresh_token_with_api(&self, studio_url: &str, refresh_token: &str) -> Result<AuthToken> {
+    async fn refresh_token_with_api(
+        &self,
+        studio_url: &str,
+        refresh_token: &str,
+    ) -> Result<AuthToken> {
         let refresh_url = format!("{}/api/auth/refresh", studio_url);
-        
+
         let mut refresh_request = std::collections::HashMap::new();
         refresh_request.insert("grant_type", "refresh_token");
         refresh_request.insert("refresh_token", refresh_token);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&refresh_url)
             .json(&refresh_request)
             .send()
@@ -284,11 +311,9 @@ impl StudioAuthService {
             .map_err(|e| StudioError::Network(e))?;
 
         if response.status().is_success() {
-            let auth_response: AuthResponse = response
-                .json()
-                .await
-                .map_err(|e| StudioError::Network(e))?;
-            
+            let auth_response: AuthResponse =
+                response.json().await.map_err(|e| StudioError::Network(e))?;
+
             Ok(self.create_auth_token(auth_response, studio_url)?)
         } else {
             Err(StudioError::Auth("Token refresh failed".to_string()))
@@ -298,11 +323,12 @@ impl StudioAuthService {
     /// Revoke token on server
     async fn revoke_token(&self, studio_url: &str, access_token: &str) -> Result<()> {
         let revoke_url = format!("{}/api/auth/revoke", studio_url);
-        
+
         let mut revoke_request = std::collections::HashMap::new();
         revoke_request.insert("token", access_token);
 
-        let _response = self.client
+        let _response = self
+            .client
             .post(&revoke_url)
             .bearer_auth(access_token)
             .json(&revoke_request)
@@ -316,7 +342,8 @@ impl StudioAuthService {
 
     /// Create AuthToken from API response
     fn create_auth_token(&self, response: AuthResponse, studio_url: &str) -> Result<AuthToken> {
-        let scopes = response.scope
+        let scopes = response
+            .scope
             .map(|s| s.split_whitespace().map(|s| s.to_string()).collect())
             .unwrap_or_default();
 
@@ -345,33 +372,34 @@ impl StudioAuthService {
 
         // This will fail with dummy key, so just return basic claims
         // In production implementation, proper JWT validation would be done
-        Err(StudioError::Auth("JWT validation not implemented with dummy key".to_string()))
+        Err(StudioError::Auth(
+            "JWT validation not implemented with dummy key".to_string(),
+        ))
     }
 
     /// Normalize Studio URL for consistent storage
     fn normalize_studio_url(&self, url: &str) -> Result<String> {
         let mut normalized = url.trim_end_matches('/').to_string();
-        
+
         if !normalized.starts_with("http://") && !normalized.starts_with("https://") {
             normalized = format!("https://{}", normalized);
         }
 
         // Validate URL format
-        url::Url::parse(&normalized)
-            .map_err(|e| StudioError::UrlParse(e))?;
+        url::Url::parse(&normalized).map_err(|e| StudioError::UrlParse(e))?;
 
         Ok(normalized)
     }
 
     /// Generate instance ID from URL and environment
     fn generate_instance_id(&self, studio_url: &str, environment: &str) -> String {
-        use sha1::{Sha1, Digest};
-        
+        use sha1::{Digest, Sha1};
+
         let mut hasher = Sha1::new();
         hasher.update(studio_url.as_bytes());
         hasher.update(environment.as_bytes());
         let result = hasher.finalize();
-        
+
         hex::encode(&result[..8])
     }
 }
@@ -382,16 +410,15 @@ impl AuthManager {
         // Clone what we need for the blocking task
         let creds = credentials.clone();
         let storage_clone = TokenStorage::new("studio-mcp".to_string())?;
-        
-        tokio::task::spawn_blocking(move || {
-            storage_clone.store_credentials(&creds)
-        })
-        .await
-        .map_err(|e| StudioError::Unknown(format!("Task join error: {}", e)))??;
+
+        tokio::task::spawn_blocking(move || storage_clone.store_credentials(&creds))
+            .await
+            .map_err(|e| StudioError::Unknown(format!("Task join error: {}", e)))??;
 
         // Update cache
         let cache_key = format!("{}:{}", credentials.environment, credentials.instance_id);
-        self.credentials_cache.insert(cache_key, credentials.clone());
+        self.credentials_cache
+            .insert(cache_key, credentials.clone());
 
         Ok(())
     }
@@ -404,14 +431,16 @@ mod tests {
     #[tokio::test]
     async fn test_studio_url_normalization() {
         let service = StudioAuthService::new(30).unwrap();
-        
+
         assert_eq!(
             service.normalize_studio_url("studio.example.com").unwrap(),
             "https://studio.example.com"
         );
-        
+
         assert_eq!(
-            service.normalize_studio_url("https://studio.example.com/").unwrap(),
+            service
+                .normalize_studio_url("https://studio.example.com/")
+                .unwrap(),
             "https://studio.example.com"
         );
     }
@@ -419,11 +448,11 @@ mod tests {
     #[test]
     fn test_instance_id_generation() {
         let service = StudioAuthService::new(30).unwrap();
-        
+
         let id1 = service.generate_instance_id("https://studio.example.com", "dev");
         let id2 = service.generate_instance_id("https://studio.example.com", "dev");
         let id3 = service.generate_instance_id("https://studio.example.com", "prod");
-        
+
         assert_eq!(id1, id2); // Same inputs should produce same ID
         assert_ne!(id1, id3); // Different environment should produce different ID
     }

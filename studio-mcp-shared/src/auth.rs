@@ -1,13 +1,13 @@
 //! Authentication and token management for WindRiver Studio
 
+use crate::{Result, StudioError};
+use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit, Nonce};
+use base64::{engine::general_purpose, Engine as _};
+use chrono::{DateTime, Duration, Utc};
+use keyring::Entry;
+use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
-use keyring::Entry;
-use aes_gcm::{Aes256Gcm, Nonce, KeyInit, AeadInPlace};
-use rand::{RngCore, rngs::OsRng};
-use base64::{Engine as _, engine::general_purpose};
-use crate::{Result, StudioError};
 
 /// Authentication token information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ impl AuthToken {
         scopes: Vec<String>,
     ) -> Self {
         let expires_at = Utc::now() + Duration::seconds(expires_in);
-        
+
         Self {
             access_token,
             refresh_token,
@@ -175,7 +175,7 @@ impl TokenStorage {
     pub fn new(service_name: String) -> Result<Self> {
         // Generate or load encryption key
         let encryption_key = Self::get_or_create_encryption_key(&service_name)?;
-        
+
         Ok(Self {
             service_name,
             encryption_key,
@@ -189,34 +189,40 @@ impl TokenStorage {
             .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
 
         // Serialize and encrypt credentials
-        let serialized = serde_json::to_vec(credentials)
-            .map_err(|e| StudioError::Json(e))?;
-        
+        let serialized = serde_json::to_vec(credentials).map_err(|e| StudioError::Json(e))?;
+
         let encrypted = self.encrypt_data(&serialized)?;
         let encoded = general_purpose::STANDARD.encode(&encrypted);
 
-        entry.set_password(&encoded)
+        entry
+            .set_password(&encoded)
             .map_err(|e| StudioError::Auth(format!("Failed to store credentials: {}", e)))?;
 
         Ok(())
     }
 
     /// Retrieve and decrypt credentials from the OS keyring
-    pub fn load_credentials(&self, instance_id: &str, environment: &str) -> Result<AuthCredentials> {
+    pub fn load_credentials(
+        &self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthCredentials> {
         let key = format!("studio-mcp:{}:{}", environment, instance_id);
         let entry = Entry::new(&self.service_name, &key)
             .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
 
-        let encoded = entry.get_password()
+        let encoded = entry
+            .get_password()
             .map_err(|e| StudioError::Auth(format!("Failed to retrieve credentials: {}", e)))?;
 
-        let encrypted = general_purpose::STANDARD.decode(encoded)
+        let encrypted = general_purpose::STANDARD
+            .decode(encoded)
             .map_err(|e| StudioError::Auth(format!("Failed to decode credentials: {}", e)))?;
 
         let decrypted = self.decrypt_data(&encrypted)?;
-        
-        let credentials: AuthCredentials = serde_json::from_slice(&decrypted)
-            .map_err(|e| StudioError::Json(e))?;
+
+        let credentials: AuthCredentials =
+            serde_json::from_slice(&decrypted).map_err(|e| StudioError::Json(e))?;
 
         Ok(credentials)
     }
@@ -227,7 +233,8 @@ impl TokenStorage {
         let entry = Entry::new(&self.service_name, &key)
             .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
 
-        entry.delete_credential()
+        entry
+            .delete_credential()
             .map_err(|e| StudioError::Auth(format!("Failed to remove credentials: {}", e)))?;
 
         Ok(())
@@ -251,7 +258,8 @@ impl TokenStorage {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let mut buffer = data.to_vec();
-        cipher.encrypt_in_place(nonce, b"", &mut buffer)
+        cipher
+            .encrypt_in_place(nonce, b"", &mut buffer)
             .map_err(|e| StudioError::Auth(format!("Encryption failed: {}", e)))?;
 
         // Prepend nonce to encrypted data
@@ -268,11 +276,12 @@ impl TokenStorage {
 
         let (nonce_bytes, ciphertext) = encrypted_data.split_at(12);
         let nonce = Nonce::from_slice(nonce_bytes);
-        
+
         let cipher = Aes256Gcm::new(&self.encryption_key.into());
 
         let mut buffer = ciphertext.to_vec();
-        cipher.decrypt_in_place(nonce, b"", &mut buffer)
+        cipher
+            .decrypt_in_place(nonce, b"", &mut buffer)
             .map_err(|e| StudioError::Auth(format!("Decryption failed: {}", e)))?;
 
         Ok(buffer)
@@ -285,11 +294,14 @@ impl TokenStorage {
 
         match key_entry.get_password() {
             Ok(encoded_key) => {
-                let key_bytes = general_purpose::STANDARD.decode(encoded_key)
-                    .map_err(|e| StudioError::Auth(format!("Failed to decode encryption key: {}", e)))?;
-                
+                let key_bytes = general_purpose::STANDARD.decode(encoded_key).map_err(|e| {
+                    StudioError::Auth(format!("Failed to decode encryption key: {}", e))
+                })?;
+
                 if key_bytes.len() != 32 {
-                    return Err(StudioError::Auth("Invalid encryption key length".to_string()));
+                    return Err(StudioError::Auth(
+                        "Invalid encryption key length".to_string(),
+                    ));
                 }
 
                 let mut key = [0u8; 32];
@@ -300,10 +312,11 @@ impl TokenStorage {
                 // Generate new key
                 let mut key = [0u8; 32];
                 OsRng.fill_bytes(&mut key);
-                
+
                 let encoded_key = general_purpose::STANDARD.encode(&key);
-                key_entry.set_password(&encoded_key)
-                    .map_err(|e| StudioError::Auth(format!("Failed to store encryption key: {}", e)))?;
+                key_entry.set_password(&encoded_key).map_err(|e| {
+                    StudioError::Auth(format!("Failed to store encryption key: {}", e))
+                })?;
 
                 Ok(key)
             }
@@ -315,7 +328,7 @@ impl AuthManager {
     /// Create a new authentication manager
     pub fn new() -> Result<Self> {
         let storage = TokenStorage::new("studio-mcp".to_string())?;
-        
+
         Ok(Self {
             storage,
             credentials_cache: HashMap::new(),
@@ -332,7 +345,7 @@ impl AuthManager {
     ) -> Result<AuthCredentials> {
         // This would typically make an HTTP request to the Studio auth endpoint
         // For now, we'll create a mock implementation
-        
+
         let instance_id = self.generate_instance_id(studio_url, environment);
         let mut credentials = AuthCredentials::new(
             instance_id.clone(),
@@ -355,15 +368,20 @@ impl AuthManager {
 
         // Store credentials securely
         self.storage.store_credentials(&credentials)?;
-        
+
         // Cache credentials
-        self.credentials_cache.insert(instance_id, credentials.clone());
+        self.credentials_cache
+            .insert(instance_id, credentials.clone());
 
         Ok(credentials)
     }
 
     /// Get cached or stored credentials for an instance
-    pub fn get_credentials(&mut self, instance_id: &str, environment: &str) -> Result<AuthCredentials> {
+    pub fn get_credentials(
+        &mut self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthCredentials> {
         // Check cache first
         let cache_key = format!("{}:{}", environment, instance_id);
         if let Some(credentials) = self.credentials_cache.get(&cache_key) {
@@ -372,15 +390,20 @@ impl AuthManager {
 
         // Load from storage
         let credentials = self.storage.load_credentials(instance_id, environment)?;
-        self.credentials_cache.insert(cache_key, credentials.clone());
-        
+        self.credentials_cache
+            .insert(cache_key, credentials.clone());
+
         Ok(credentials)
     }
 
     /// Refresh an expired token
-    pub async fn refresh_token(&mut self, instance_id: &str, environment: &str) -> Result<AuthToken> {
+    pub async fn refresh_token(
+        &mut self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthToken> {
         let mut credentials = self.get_credentials(instance_id, environment)?;
-        
+
         if let Some(token) = &credentials.token {
             if let Some(refresh_token) = &token.refresh_token {
                 // Make refresh request to Studio API
@@ -396,7 +419,7 @@ impl AuthManager {
                 // Update stored credentials
                 credentials.set_token(new_token.clone());
                 self.storage.store_credentials(&credentials)?;
-                
+
                 // Update cache
                 let cache_key = format!("{}:{}", environment, instance_id);
                 self.credentials_cache.insert(cache_key, credentials);
@@ -422,13 +445,13 @@ impl AuthManager {
 
     /// Generate a unique instance ID
     fn generate_instance_id(&self, studio_url: &str, environment: &str) -> String {
-        use sha1::{Sha1, Digest};
-        
+        use sha1::{Digest, Sha1};
+
         let mut hasher = Sha1::new();
         hasher.update(studio_url.as_bytes());
         hasher.update(environment.as_bytes());
         let result = hasher.finalize();
-        
+
         hex::encode(&result[..8]) // Use first 8 bytes for shorter ID
     }
 }

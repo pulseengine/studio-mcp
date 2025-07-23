@@ -1,16 +1,16 @@
 //! Authentication middleware for MCP server operations
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
 use studio_mcp_shared::{
-    AuthCredentials, TokenValidator, ValidationResult, StudioAuthService,
-    Result, StudioError
+    AuthCredentials, Result, StudioAuthService, StudioError, TokenValidator, ValidationResult,
 };
+use tokio::sync::RwLock;
 use tracing::{debug, error};
 
 /// Authentication context for MCP operations
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AuthContext {
     /// Authenticated user credentials
     pub credentials: AuthCredentials,
@@ -23,6 +23,7 @@ pub struct AuthContext {
 }
 
 /// Authentication middleware for MCP server
+#[allow(dead_code)]
 pub struct AuthMiddleware {
     /// Token validator
     validator: Arc<TokenValidator>,
@@ -36,6 +37,7 @@ pub struct AuthMiddleware {
     default_environment: String,
 }
 
+#[allow(dead_code)]
 impl AuthMiddleware {
     /// Create new authentication middleware
     pub fn new(default_environment: String) -> Result<Self> {
@@ -59,15 +61,21 @@ impl AuthMiddleware {
 
     /// Authenticate and get auth context for default instance
     pub async fn get_default_auth_context(&self) -> Result<AuthContext> {
-        let instance_id = self.default_instance
+        let instance_id = self
+            .default_instance
             .as_ref()
             .ok_or_else(|| StudioError::Auth("No default instance configured".to_string()))?;
 
-        self.get_auth_context(instance_id, &self.default_environment).await
+        self.get_auth_context(instance_id, &self.default_environment)
+            .await
     }
 
     /// Get authentication context for specific instance
-    pub async fn get_auth_context(&self, instance_id: &str, environment: &str) -> Result<AuthContext> {
+    pub async fn get_auth_context(
+        &self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthContext> {
         let cache_key = format!("{}:{}", environment, instance_id);
 
         // Check cache first
@@ -76,7 +84,10 @@ impl AuthMiddleware {
             if let Some(context) = cache.get(&cache_key) {
                 // Validate cached context is still fresh
                 if context.validation.is_valid_and_fresh() {
-                    debug!("Using cached auth context for {}:{}", environment, instance_id);
+                    debug!(
+                        "Using cached auth context for {}:{}",
+                        environment, instance_id
+                    );
                     return Ok(context.clone());
                 }
             }
@@ -85,7 +96,9 @@ impl AuthMiddleware {
         // Load or refresh credentials
         let credentials = {
             let mut auth_service = self.auth_service.write().await;
-            auth_service.get_credentials(instance_id, environment).await?
+            auth_service
+                .get_credentials(instance_id, environment)
+                .await?
         };
 
         // Validate token
@@ -93,8 +106,13 @@ impl AuthMiddleware {
         let validation = self.validator.validate_token(token).await?;
 
         if !validation.is_valid {
-            error!("Token validation failed for {}:{}: {:?}", environment, instance_id, validation.errors);
-            return Err(StudioError::Auth("Invalid authentication token".to_string()));
+            error!(
+                "Token validation failed for {}:{}: {:?}",
+                environment, instance_id, validation.errors
+            );
+            return Err(StudioError::Auth(
+                "Invalid authentication token".to_string(),
+            ));
         }
 
         // Create auth context
@@ -114,12 +132,19 @@ impl AuthMiddleware {
             cache.insert(cache_key, context.clone());
         }
 
-        debug!("Created new auth context for {}:{}", environment, instance_id);
+        debug!(
+            "Created new auth context for {}:{}",
+            environment, instance_id
+        );
         Ok(context)
     }
 
     /// Validate permissions for specific operation
-    pub fn validate_operation_permissions(&self, context: &AuthContext, required_scopes: &[String]) -> Result<()> {
+    pub fn validate_operation_permissions(
+        &self,
+        context: &AuthContext,
+        required_scopes: &[String],
+    ) -> Result<()> {
         if let Some(claims) = &context.validation.claims {
             if self.validator.validate_permissions(claims, required_scopes) {
                 Ok(())
@@ -130,13 +155,16 @@ impl AuthMiddleware {
                 )))
             }
         } else {
-            Err(StudioError::Auth("No token claims available for permission validation".to_string()))
+            Err(StudioError::Auth(
+                "No token claims available for permission validation".to_string(),
+            ))
         }
     }
 
     /// Check if user has specific role
     pub fn has_role(&self, context: &AuthContext, role: &str) -> bool {
-        context.user_info
+        context
+            .user_info
             .as_ref()
             .map(|(_, roles)| roles.contains(&role.to_string()))
             .unwrap_or(false)
@@ -166,7 +194,9 @@ impl AuthMiddleware {
     ) -> Result<AuthContext> {
         let credentials = {
             let mut auth_service = self.auth_service.write().await;
-            auth_service.authenticate(studio_url, username, password, environment).await?
+            auth_service
+                .authenticate(studio_url, username, password, environment)
+                .await?
         };
 
         // Create and cache auth context
@@ -198,16 +228,17 @@ impl AuthMiddleware {
 
     /// Get current user information
     pub fn get_user_info(&self, context: &AuthContext) -> Option<UserInfo> {
-        context.user_info.as_ref().map(|(username, roles)| {
-            UserInfo {
+        context
+            .user_info
+            .as_ref()
+            .map(|(username, roles)| UserInfo {
                 username: username.clone(),
                 roles: roles.clone(),
                 scopes: context.scopes.clone(),
                 instance_id: context.credentials.instance_id.clone(),
                 environment: context.credentials.environment.clone(),
                 studio_url: context.credentials.studio_url.clone(),
-            }
-        })
+            })
     }
 
     /// Clean up expired cache entries
@@ -225,7 +256,8 @@ impl AuthMiddleware {
     pub async fn get_auth_stats(&self) -> AuthStats {
         let cache = self.auth_cache.read().await;
         let total_contexts = cache.len();
-        let valid_contexts = cache.values()
+        let valid_contexts = cache
+            .values()
             .filter(|context| context.validation.is_valid_and_fresh())
             .count();
         let expired_contexts = total_contexts - valid_contexts;
@@ -234,15 +266,14 @@ impl AuthMiddleware {
             total_contexts,
             valid_contexts,
             expired_contexts,
-            instances: cache.keys()
-                .map(|key| key.clone())
-                .collect(),
+            instances: cache.keys().map(|key| key.clone()).collect(),
         }
     }
 }
 
 /// User information extracted from authentication context
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct UserInfo {
     pub username: String,
     pub roles: Vec<String>,
@@ -254,6 +285,7 @@ pub struct UserInfo {
 
 /// Authentication statistics
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AuthStats {
     pub total_contexts: usize,
     pub valid_contexts: usize,
@@ -261,6 +293,7 @@ pub struct AuthStats {
     pub instances: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl AuthContext {
     /// Check if context has specific scope
     pub fn has_scope(&self, scope: &str) -> bool {
@@ -323,8 +356,8 @@ mod tests {
 
     #[test]
     fn test_auth_context_scopes() {
-        use studio_mcp_shared::{AuthToken, AuthCredentials};
-        
+        use studio_mcp_shared::AuthCredentials;
+
         let credentials = AuthCredentials::new(
             "test_instance".to_string(),
             "https://studio.example.com".to_string(),

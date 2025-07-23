@@ -1,10 +1,10 @@
 //! Authentication-aware CLI manager that integrates with Studio auth
 
 use crate::CliManager;
-use studio_mcp_shared::{StudioAuthService, AuthCredentials, Result};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
+use studio_mcp_shared::{AuthCredentials, Result, StudioAuthService};
+use tokio::sync::RwLock;
 
 /// Authentication-aware CLI manager
 pub struct AuthenticatedCliManager {
@@ -55,9 +55,13 @@ impl AuthenticatedCliManager {
     }
 
     /// Get credentials for an instance
-    pub async fn get_credentials(&self, instance_id: &str, environment: &str) -> Result<AuthCredentials> {
+    pub async fn get_credentials(
+        &self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthCredentials> {
         let cache_key = format!("{}:{}", environment, instance_id);
-        
+
         // Check cache first
         {
             let cache = self.credentials_cache.read().await;
@@ -70,7 +74,9 @@ impl AuthenticatedCliManager {
 
         // Load from auth service (which will handle refresh if needed)
         let mut auth_service = self.auth_service.write().await;
-        let credentials = auth_service.get_credentials(instance_id, environment).await?;
+        let credentials = auth_service
+            .get_credentials(instance_id, environment)
+            .await?;
 
         // Update cache
         let mut cache = self.credentials_cache.write().await;
@@ -93,8 +99,10 @@ impl AuthenticatedCliManager {
 
         // Build authenticated CLI args
         let mut auth_args = vec![
-            "--url", &credentials.studio_url,
-            "--token", &token.access_token,
+            "--url",
+            &credentials.studio_url,
+            "--token",
+            &token.access_token,
         ];
         auth_args.extend_from_slice(args);
 
@@ -112,8 +120,10 @@ impl AuthenticatedCliManager {
         let token = credentials.get_valid_token()?;
 
         let mut auth_args = vec![
-            "--url", &credentials.studio_url,
-            "--token", &token.access_token,
+            "--url",
+            &credentials.studio_url,
+            "--token",
+            &token.access_token,
         ];
         auth_args.extend_from_slice(args);
 
@@ -137,7 +147,9 @@ impl AuthenticatedCliManager {
     }
 
     /// List authenticated Studio instances
-    pub async fn list_authenticated_instances(&self) -> Result<Vec<studio_mcp_shared::StudioInstance>> {
+    pub async fn list_authenticated_instances(
+        &self,
+    ) -> Result<Vec<studio_mcp_shared::StudioInstance>> {
         let auth_service = self.auth_service.read().await;
         auth_service.list_instances().await
     }
@@ -159,12 +171,18 @@ impl AuthenticatedCliManager {
     }
 
     /// Refresh credentials for an instance
-    pub async fn refresh_credentials(&self, instance_id: &str, environment: &str) -> Result<AuthCredentials> {
+    pub async fn refresh_credentials(
+        &self,
+        instance_id: &str,
+        environment: &str,
+    ) -> Result<AuthCredentials> {
         let mut auth_service = self.auth_service.write().await;
-        
+
         // Get current credentials
-        let credentials = auth_service.get_credentials(instance_id, environment).await?;
-        
+        let credentials = auth_service
+            .get_credentials(instance_id, environment)
+            .await?;
+
         // Force refresh
         let refreshed = auth_service.refresh_credentials(credentials).await?;
 
@@ -208,7 +226,8 @@ impl AuthenticatedCommand {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        self.args.extend(args.into_iter().map(|s| s.as_ref().to_string()));
+        self.args
+            .extend(args.into_iter().map(|s| s.as_ref().to_string()));
         self
     }
 
@@ -221,7 +240,7 @@ impl AuthenticatedCommand {
     /// Execute the command
     pub async fn execute(self) -> Result<serde_json::Value> {
         let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
-        
+
         self.cli_manager
             .execute_authenticated(
                 &args,
@@ -244,7 +263,8 @@ mod tests {
         let manager = AuthenticatedCliManager::new(
             "https://test.example.com".to_string(),
             Some(temp_dir.path().to_path_buf()),
-        ).await;
+        )
+        .await;
 
         assert!(manager.is_ok());
     }
@@ -258,16 +278,13 @@ mod tests {
                 Some(temp_dir.path().to_path_buf()),
             )
             .await
-            .unwrap()
+            .unwrap(),
         );
 
-        let command = AuthenticatedCommand::new(
-            manager,
-            "test_instance".to_string(),
-            "dev".to_string(),
-        )
-        .args(["plm", "pipeline", "list"])
-        .working_dir(temp_dir.path());
+        let command =
+            AuthenticatedCommand::new(manager, "test_instance".to_string(), "dev".to_string())
+                .args(["plm", "pipeline", "list"])
+                .working_dir(temp_dir.path());
 
         // This would fail since we don't have real credentials, but tests the builder
         assert_eq!(command.args, vec!["plm", "pipeline", "list"]);

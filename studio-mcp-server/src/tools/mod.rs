@@ -1,10 +1,10 @@
 //! Tool providers for WindRiver Studio MCP server
 
-use std::sync::Arc;
-use pulseengine_mcp_protocol::{Tool, Content};
-use studio_mcp_shared::{StudioConfig, Result, StudioError};
-use studio_cli_manager::CliManager;
+use pulseengine_mcp_protocol::{Content, Tool};
 use serde_json::Value;
+use std::sync::Arc;
+use studio_cli_manager::CliManager;
+use studio_mcp_shared::{Result, StudioConfig, StudioError};
 use tracing::{debug, error, warn};
 
 pub mod plm;
@@ -20,7 +20,7 @@ pub struct ToolProvider {
 impl ToolProvider {
     pub fn new(cli_manager: Arc<CliManager>, config: StudioConfig) -> Self {
         let plm_provider = PlmToolProvider::new(cli_manager.clone(), config.clone());
-        
+
         Self {
             cli_manager,
             config,
@@ -50,15 +50,16 @@ impl ToolProvider {
             "studio_status" => self.get_studio_status().await,
             "studio_version" => self.get_studio_version().await,
             "cli_info" => self.get_cli_info().await,
-            
+
             // PLM tools (delegate to PLM provider)
-            name if name.starts_with("plm_") => {
-                self.plm_provider.call_tool(name, arguments).await
-            }
-            
+            name if name.starts_with("plm_") => self.plm_provider.call_tool(name, arguments).await,
+
             _ => {
                 error!("Unknown tool: {}", name);
-                Err(StudioError::InvalidOperation(format!("Tool '{}' not found", name)))
+                Err(StudioError::InvalidOperation(format!(
+                    "Tool '{}' not found",
+                    name
+                )))
             }
         }
     }
@@ -85,7 +86,8 @@ impl ToolProvider {
             },
             Tool {
                 name: "cli_info".to_string(),
-                description: "Get detailed information about the Studio CLI installation".to_string(),
+                description: "Get detailed information about the Studio CLI installation"
+                    .to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {},
@@ -96,7 +98,10 @@ impl ToolProvider {
     }
 
     async fn get_studio_status(&self) -> Result<Vec<Content>> {
-        let cli_versions = self.cli_manager.list_installed_versions().unwrap_or_default();
+        let cli_versions = self
+            .cli_manager
+            .list_installed_versions()
+            .unwrap_or_default();
         let default_connection = self.config.get_default_connection();
 
         let status = serde_json::json!({
@@ -143,17 +148,15 @@ impl ToolProvider {
 
         // Try to get CLI version if available
         match self.cli_manager.ensure_cli(None).await {
-            Ok(_cli_path) => {
-                match self.cli_manager.execute(&["--version"], None).await {
-                    Ok(cli_version) => {
-                        version_info["cli"]["current_version"] = cli_version;
-                    }
-                    Err(e) => {
-                        warn!("Failed to get CLI version: {}", e);
-                        version_info["cli"]["version_error"] = Value::String(e.to_string());
-                    }
+            Ok(_cli_path) => match self.cli_manager.execute(&["--version"], None).await {
+                Ok(cli_version) => {
+                    version_info["cli"]["current_version"] = cli_version;
                 }
-            }
+                Err(e) => {
+                    warn!("Failed to get CLI version: {}", e);
+                    version_info["cli"]["version_error"] = Value::String(e.to_string());
+                }
+            },
             Err(e) => {
                 warn!("CLI not available: {}", e);
                 version_info["cli"]["availability_error"] = Value::String(e.to_string());
@@ -166,8 +169,11 @@ impl ToolProvider {
     }
 
     async fn get_cli_info(&self) -> Result<Vec<Content>> {
-        let installed_versions = self.cli_manager.list_installed_versions().unwrap_or_default();
-        
+        let installed_versions = self
+            .cli_manager
+            .list_installed_versions()
+            .unwrap_or_default();
+
         let mut info = serde_json::json!({
             "installation": {
                 "base_url": self.config.cli.download_base_url,

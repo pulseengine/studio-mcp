@@ -1,11 +1,11 @@
 //! CLI downloader - handles downloading and verifying CLI binaries
 
-use studio_mcp_shared::{Result, StudioError, CliVersion};
-use std::path::Path;
-use reqwest::Client;
-use sha1::{Sha1, Digest};
 use flate2::read::GzDecoder;
+use reqwest::Client;
+use sha1::{Digest, Sha1};
 use std::io::{Read, Write};
+use std::path::Path;
+use studio_mcp_shared::{CliVersion, Result, StudioError};
 
 pub struct CliDownloader {
     client: Client,
@@ -23,7 +23,11 @@ impl CliDownloader {
     }
 
     /// Download and install CLI binary
-    pub async fn download_and_install(&self, cli_version: &CliVersion, target_path: &Path) -> Result<()> {
+    pub async fn download_and_install(
+        &self,
+        cli_version: &CliVersion,
+        target_path: &Path,
+    ) -> Result<()> {
         tracing::info!("Downloading CLI from: {}", cli_version.url);
 
         // Create parent directory
@@ -33,15 +37,15 @@ impl CliDownloader {
 
         // Download file
         let response = self.client.get(&cli_version.url).send().await?;
-        
+
         if !response.status().is_success() {
             return Err(StudioError::Network(reqwest::Error::from(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             )));
         }
 
         let bytes = response.bytes().await?;
-        
+
         // Verify checksum
         self.verify_checksum(&bytes, &cli_version.checksum)?;
 
@@ -117,7 +121,6 @@ impl CliDownloader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_platform_detection() {
@@ -128,10 +131,10 @@ mod tests {
     #[test]
     fn test_download_url_generation() {
         let downloader = CliDownloader::new("https://example.com/cli".to_string());
-        
+
         let url = downloader.get_download_url("1.0.0", "linux");
         assert_eq!(url, "https://example.com/cli/1.0.0/linux/studio-cli.gz");
-        
+
         let url = downloader.get_download_url("1.0.0", "windows");
         assert_eq!(url, "https://example.com/cli/1.0.0/win64/studio-cli.exe.gz");
     }
@@ -140,15 +143,15 @@ mod tests {
     fn test_checksum_verification() {
         let downloader = CliDownloader::new("https://example.com/cli".to_string());
         let data = b"test data";
-        
+
         // Calculate correct checksum
         let mut hasher = Sha1::new();
         hasher.update(data);
         let correct_checksum = hex::encode(hasher.finalize());
-        
+
         // Should succeed with correct checksum
         assert!(downloader.verify_checksum(data, &correct_checksum).is_ok());
-        
+
         // Should fail with incorrect checksum
         assert!(downloader.verify_checksum(data, "wrong_checksum").is_err());
     }
@@ -157,18 +160,18 @@ mod tests {
     fn test_gzip_decompression() {
         use flate2::write::GzEncoder;
         use flate2::Compression;
-        
+
         let downloader = CliDownloader::new("https://example.com/cli".to_string());
         let original_data = b"test data for compression";
-        
+
         // Compress data
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(original_data).unwrap();
         let compressed = encoder.finish().unwrap();
-        
+
         // Decompress using our function
         let decompressed = downloader.decompress_gzip(&compressed).unwrap();
-        
+
         assert_eq!(decompressed, original_data);
     }
 }

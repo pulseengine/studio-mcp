@@ -1,12 +1,12 @@
 //! CLI executor - handles executing CLI commands and parsing output
 
-use studio_mcp_shared::{Result, StudioError, OperationType};
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
+use studio_mcp_shared::{Result, StudioError};
 use tokio::process::Command;
 use tokio::time::timeout;
-use serde_json::Value;
 
 pub struct CliExecutor {
     #[allow(dead_code)]
@@ -25,7 +25,8 @@ impl CliExecutor {
         args: &[&str],
         working_dir: Option<&Path>,
     ) -> Result<Value> {
-        self.execute_with_timeout(cli_path, args, working_dir, Duration::from_secs(300)).await
+        self.execute_with_timeout(cli_path, args, working_dir, Duration::from_secs(300))
+            .await
     }
 
     /// Execute CLI command with custom timeout
@@ -39,9 +40,7 @@ impl CliExecutor {
         tracing::debug!("Executing CLI: {} {}", cli_path.display(), args.join(" "));
 
         let mut cmd = Command::new(cli_path);
-        cmd.args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
 
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
@@ -54,20 +53,22 @@ impl CliExecutor {
 
         // Execute with timeout
         let output_result = timeout(timeout_duration, cmd.output()).await;
-        
+
         let output = match output_result {
             Ok(Ok(output)) => output,
             Ok(Err(e)) => return Err(StudioError::Cli(format!("Command execution failed: {}", e))),
-            Err(_) => return Err(StudioError::Cli(format!(
-                "Command timed out after {} seconds", 
-                timeout_duration.as_secs()
-            ))),
+            Err(_) => {
+                return Err(StudioError::Cli(format!(
+                    "Command timed out after {} seconds",
+                    timeout_duration.as_secs()
+                )))
+            }
         };
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             tracing::error!(
                 "CLI command failed with status {}: stderr={}, stdout={}",
                 output.status,
@@ -77,8 +78,7 @@ impl CliExecutor {
 
             return Err(StudioError::Cli(format!(
                 "Command failed with status {}: {}",
-                output.status,
-                stderr
+                output.status, stderr
             )));
         }
 
@@ -109,30 +109,32 @@ impl CliExecutor {
     {
         use tokio::io::{AsyncBufReadExt, BufReader};
 
-        tracing::debug!("Executing CLI with streaming: {} {}", cli_path.display(), args.join(" "));
+        tracing::debug!(
+            "Executing CLI with streaming: {} {}",
+            cli_path.display(),
+            args.join(" ")
+        );
 
         let mut cmd = Command::new(cli_path);
-        cmd.args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
 
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }
 
         let mut child = cmd.spawn()?;
-        
+
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
             let mut lines = reader.lines();
-            
+
             while let Some(line) = lines.next_line().await? {
                 output_handler(line)?;
             }
         }
 
         let status = child.wait().await?;
-        
+
         if !status.success() {
             return Err(StudioError::Cli(format!(
                 "Streaming command failed with status {}",
@@ -154,7 +156,7 @@ impl CliExecutor {
     /// Get CLI version information
     pub async fn get_version(&self, cli_path: &Path) -> Result<String> {
         let output = self.execute(cli_path, &["--version"], None).await?;
-        
+
         // Parse version from output
         if let Some(version_str) = output.as_str() {
             Ok(version_str.to_string())
@@ -162,21 +164,29 @@ impl CliExecutor {
             if let Some(version) = obj.get("version").and_then(|v| v.as_str()) {
                 Ok(version.to_string())
             } else {
-                Err(StudioError::Cli("Unable to parse version from output".to_string()))
+                Err(StudioError::Cli(
+                    "Unable to parse version from output".to_string(),
+                ))
             }
         } else {
-            Err(StudioError::Cli("Unexpected version output format".to_string()))
+            Err(StudioError::Cli(
+                "Unexpected version output format".to_string(),
+            ))
         }
     }
 
     /// Execute PLM-specific commands
-    pub async fn plm_list_pipelines(&self, cli_path: &Path, project_id: Option<&str>) -> Result<Value> {
+    pub async fn plm_list_pipelines(
+        &self,
+        cli_path: &Path,
+        project_id: Option<&str>,
+    ) -> Result<Value> {
         let mut args = vec!["plm", "pipeline", "list"];
-        
+
         if let Some(project) = project_id {
             args.extend_from_slice(&["--project", project]);
         }
-        
+
         self.execute(cli_path, &args, None).await
     }
 
@@ -215,7 +225,6 @@ impl CliExecutor {
 mod tests {
     use super::*;
     use tempfile::TempDir;
-    use std::fs;
 
     #[tokio::test]
     async fn test_executor_creation() {
@@ -229,7 +238,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let executor = CliExecutor::new(temp_dir.path().to_path_buf());
         let fake_cli_path = temp_dir.path().join("nonexistent-cli");
-        
+
         let result = executor.check_cli(&fake_cli_path).await.unwrap();
         assert!(!result);
     }

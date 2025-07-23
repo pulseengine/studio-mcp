@@ -149,11 +149,12 @@ pub struct ResourceUri {
 impl ResourceUri {
     pub fn parse(uri: &str) -> crate::Result<Self> {
         let parsed = url::Url::parse(uri)?;
-        
+
         if parsed.scheme() != "studio" {
-            return Err(crate::StudioError::InvalidOperation(
-                format!("Invalid scheme: {}", parsed.scheme())
-            ));
+            return Err(crate::StudioError::InvalidOperation(format!(
+                "Invalid scheme: {}",
+                parsed.scheme()
+            )));
         }
 
         let path: Vec<String> = parsed
@@ -181,13 +182,14 @@ impl ResourceUri {
         let query = if self.query.is_empty() {
             String::new()
         } else {
-            let query_string: Vec<String> = self.query
+            let query_string: Vec<String> = self
+                .query
                 .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect();
             format!("?{}", query_string.join("&"))
         };
-        
+
         format!("{}:/{}{}", self.scheme, path, query)
     }
 }

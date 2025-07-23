@@ -1,10 +1,10 @@
 //! PLM (Pipeline Management) resource provider
 
-use std::sync::Arc;
-use pulseengine_mcp_protocol::{Resource, Content};
-use studio_mcp_shared::{StudioConfig, Result, StudioError, ResourceUri};
-use studio_cli_manager::CliManager;
+use pulseengine_mcp_protocol::{Content, Resource};
 use serde_json::Value;
+use std::sync::Arc;
+use studio_cli_manager::CliManager;
+use studio_mcp_shared::{ResourceUri, Result, StudioConfig, StudioError};
 use tracing::{debug, warn};
 
 pub struct PlmResourceProvider {
@@ -96,7 +96,8 @@ impl PlmResourceProvider {
             Ok(pipelines) => {
                 for pipeline in pipelines {
                     if let Some(pipeline_id) = pipeline.get("id").and_then(|v| v.as_str()) {
-                        let pipeline_name = pipeline.get("name")
+                        let pipeline_name = pipeline
+                            .get("name")
                             .and_then(|v| v.as_str())
                             .unwrap_or("Unknown Pipeline");
 
@@ -104,7 +105,10 @@ impl PlmResourceProvider {
                         resources.push(Resource {
                             uri: format!("studio://plm/pipelines/{}", pipeline_id),
                             name: format!("Pipeline: {}", pipeline_name),
-                            description: Some(format!("Pipeline definition (YAML/JSON) for {}", pipeline_name)),
+                            description: Some(format!(
+                                "Pipeline definition (YAML/JSON) for {}",
+                                pipeline_name
+                            )),
                             mime_type: Some("application/yaml".to_string()),
                             annotations: None,
                             raw: None,
@@ -114,7 +118,10 @@ impl PlmResourceProvider {
                         resources.push(Resource {
                             uri: format!("studio://plm/pipelines/{}/runs", pipeline_id),
                             name: format!("Runs: {}", pipeline_name),
-                            description: Some(format!("Execution runs for pipeline {}", pipeline_name)),
+                            description: Some(format!(
+                                "Execution runs for pipeline {}",
+                                pipeline_name
+                            )),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
                             raw: None,
@@ -124,7 +131,10 @@ impl PlmResourceProvider {
                         resources.push(Resource {
                             uri: format!("studio://plm/pipelines/{}/events", pipeline_id),
                             name: format!("Events: {}", pipeline_name),
-                            description: Some(format!("Recent events for pipeline {}", pipeline_name)),
+                            description: Some(format!(
+                                "Recent events for pipeline {}",
+                                pipeline_name
+                            )),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
                             raw: None,
@@ -133,7 +143,10 @@ impl PlmResourceProvider {
                 }
             }
             Err(e) => {
-                warn!("Failed to fetch pipeline list for resource discovery: {}", e);
+                warn!(
+                    "Failed to fetch pipeline list for resource discovery: {}",
+                    e
+                );
                 // Continue with static resources only
             }
         }
@@ -146,37 +159,22 @@ impl PlmResourceProvider {
         debug!("PLM provider reading resource: {}", uri.to_string());
 
         match uri.path.get(1).map(|s| s.as_str()) {
-            Some("pipelines") => {
-                self.read_pipeline_resource(uri).await
-            }
-            Some("runs") => {
-                self.read_runs_resource(uri).await
-            }
-            Some("tasks") => {
-                self.read_tasks_resource(uri).await
-            }
-            Some("resources") => {
-                self.read_pipeline_resources_resource(uri).await
-            }
-            Some("groups") => {
-                self.read_groups_resource(uri).await
-            }
-            Some("secrets") => {
-                self.read_secrets_resource(uri).await
-            }
-            Some("triggers") => {
-                self.read_triggers_resource(uri).await
-            }
-            Some("access-config") => {
-                self.read_access_config_resource(uri).await
-            }
+            Some("pipelines") => self.read_pipeline_resource(uri).await,
+            Some("runs") => self.read_runs_resource(uri).await,
+            Some("tasks") => self.read_tasks_resource(uri).await,
+            Some("resources") => self.read_pipeline_resources_resource(uri).await,
+            Some("groups") => self.read_groups_resource(uri).await,
+            Some("secrets") => self.read_secrets_resource(uri).await,
+            Some("triggers") => self.read_triggers_resource(uri).await,
+            Some("access-config") => self.read_access_config_resource(uri).await,
             None => {
                 // PLM root resource
                 self.read_plm_root().await
             }
-            Some(resource_type) => {
-                Err(StudioError::ResourceNotFound(format!("PLM resource type '{}' not found", resource_type)))
-            }
+            Some(resource_type) => Err(StudioError::ResourceNotFound(format!(
+                "PLM resource type '{}' not found",
+                resource_type
+            ))),
         }
     }
 
@@ -394,7 +392,11 @@ impl PlmResourceProvider {
 
     // CLI interaction methods
     async fn get_pipeline_list(&self) -> Result<Vec<Value>> {
-        match self.cli_manager.execute(&["plm", "pipeline", "list", "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "pipeline", "list", "--output", "json"], None)
+            .await
+        {
             Ok(result) => {
                 if let Some(pipelines) = result.as_array() {
                     Ok(pipelines.clone())
@@ -416,45 +418,92 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_definition(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "pipeline", "get", pipeline_id, "--output", "yaml"], None).await
+        self.cli_manager
+            .execute(
+                &["plm", "pipeline", "get", pipeline_id, "--output", "yaml"],
+                None,
+            )
+            .await
     }
 
     async fn get_pipeline_runs(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "run", "list", "--pipeline", pipeline_id, "--output", "json"], None).await
+        self.cli_manager
+            .execute(
+                &[
+                    "plm",
+                    "run",
+                    "list",
+                    "--pipeline",
+                    pipeline_id,
+                    "--output",
+                    "json",
+                ],
+                None,
+            )
+            .await
     }
 
     async fn get_pipeline_events(&self, pipeline_id: &str) -> Result<Value> {
         // Get recent run events for a pipeline
-        self.cli_manager.execute(&["plm", "run", "events", "--pipeline", pipeline_id, "--output", "json"], None).await
+        self.cli_manager
+            .execute(
+                &[
+                    "plm",
+                    "run",
+                    "events",
+                    "--pipeline",
+                    pipeline_id,
+                    "--output",
+                    "json",
+                ],
+                None,
+            )
+            .await
     }
 
     async fn get_run_details(&self, _pipeline_id: &str, run_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "run", "get", run_id, "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "run", "get", run_id, "--output", "json"], None)
+            .await
     }
 
     async fn get_all_runs(&self) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "run", "list", "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "run", "list", "--output", "json"], None)
+            .await
     }
 
     async fn get_run_by_id(&self, run_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "run", "get", run_id, "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "run", "get", run_id, "--output", "json"], None)
+            .await
     }
 
     async fn get_all_tasks(&self) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "task", "list", "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "task", "list", "--output", "json"], None)
+            .await
     }
 
     async fn get_task_details(&self, task_id: &str) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "task", "get", task_id, "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "task", "get", task_id, "--output", "json"], None)
+            .await
     }
 
     async fn get_pipeline_resources(&self) -> Result<Value> {
-        self.cli_manager.execute(&["plm", "resource", "list", "--output", "json"], None).await
+        self.cli_manager
+            .execute(&["plm", "resource", "list", "--output", "json"], None)
+            .await
     }
 
     async fn get_pipeline_groups(&self) -> Result<Value> {
         // Groups might require specific access config or pipeline context
-        match self.cli_manager.execute(&["plm", "group", "list", "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "group", "list", "--output", "json"], None)
+            .await
+        {
             Ok(result) => Ok(result),
             Err(_) => {
                 // Fallback to placeholder if command structure is different
@@ -468,7 +517,11 @@ impl PlmResourceProvider {
 
     async fn get_pipeline_secrets(&self) -> Result<Value> {
         // Secrets listing might require specific pipeline context
-        match self.cli_manager.execute(&["plm", "secret", "list", "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "secret", "list", "--output", "json"], None)
+            .await
+        {
             Ok(result) => Ok(result),
             Err(_) => {
                 // Fallback to placeholder if command structure is different
@@ -482,7 +535,11 @@ impl PlmResourceProvider {
 
     async fn get_pipeline_triggers(&self) -> Result<Value> {
         // Triggers might require specific pipeline context
-        match self.cli_manager.execute(&["plm", "trigger", "list", "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "trigger", "list", "--output", "json"], None)
+            .await
+        {
             Ok(result) => Ok(result),
             Err(_) => {
                 // Fallback to placeholder if command structure is different
@@ -496,7 +553,11 @@ impl PlmResourceProvider {
 
     async fn get_access_configs(&self) -> Result<Value> {
         // Access config might require specific context
-        match self.cli_manager.execute(&["plm", "access-config", "list", "--output", "json"], None).await {
+        match self
+            .cli_manager
+            .execute(&["plm", "access-config", "list", "--output", "json"], None)
+            .await
+        {
             Ok(result) => Ok(result),
             Err(_) => {
                 // Fallback to placeholder if command structure is different
