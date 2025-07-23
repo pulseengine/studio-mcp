@@ -100,8 +100,14 @@ echo
 log "Running integration tests..."
 echo
 
-# 1. Simple Integration Test
-run_test "Simple Integration Test" "cd tests/integration && ./simple_integration_test.sh"
+# 1. Check Docker availability and run appropriate test
+if command -v docker &> /dev/null && docker info &>/dev/null; then
+    log "Docker is available, running full integration test"
+    run_test "Full Integration Test" "cd tests/integration && ./simple_integration_test.sh"
+else
+    log "Docker not available, running minimal integration test"
+    run_test "Minimal Integration Test" "cd tests/integration && ./minimal_integration_test.sh"
+fi
 
 # 2. Configuration Tests
 run_test "Configuration Init Test" "\"$MCP_BINARY_PATH\" --init /tmp/test-config-$$.json && rm -f /tmp/test-config-$$.json"
@@ -111,8 +117,12 @@ if command -v node &> /dev/null; then
     run_test "MCP Inspector Compatibility" "echo 'q' | npx --yes @modelcontextprotocol/inspector \"$MCP_BINARY_PATH\" config.json --stdio 2>/dev/null"
 fi
 
-# 4. Mock Server Standalone Test
-run_test "Mock Server Standalone" "cd mock-studio-server && docker-compose up -d && sleep 5 && curl -s -H 'Authorization: Bearer test' http://localhost:8080/api/plm/pipelines | jq length > /dev/null && docker-compose down"
+# 4. Mock Server Standalone Test (only if Docker is available)
+if command -v docker &> /dev/null && docker info &>/dev/null; then
+    run_test "Mock Server Standalone" "cd mock-studio-server && docker-compose up -d && sleep 5 && curl -s -H 'Authorization: Bearer test-token' http://localhost:8080/api/plm/pipelines | jq length > /dev/null && docker-compose down"
+else
+    log "Skipping Mock Server Standalone test (Docker not available)"
+fi
 
 echo
 echo -e "${BLUE}================================================="
