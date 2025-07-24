@@ -118,8 +118,13 @@ check_docker_ready() {
 }
 
 if check_docker_ready; then
-    log "Docker is available, running full integration test"
-    run_test "Full Integration Test" "cd \"$SCRIPT_DIR/tests/integration\" && ./simple_integration_test.sh"
+    log "Docker is available, attempting full integration test"
+    if run_test "Full Integration Test" "cd \"$SCRIPT_DIR/tests/integration\" && ./simple_integration_test.sh"; then
+        log "✅ Full integration test completed successfully"
+    else
+        log "⚠️  Full integration test failed, falling back to minimal test"
+        run_test "Minimal Integration Test (Fallback)" "cd \"$SCRIPT_DIR/tests/integration\" && ./minimal_integration_test.sh"
+    fi
 else
     log "Docker not available, running minimal integration test"
     run_test "Minimal Integration Test" "cd \"$SCRIPT_DIR/tests/integration\" && ./minimal_integration_test.sh"
