@@ -244,6 +244,23 @@ main() {
         return 1
     fi
     
+    # Wait for Docker daemon to be ready
+    log "Waiting for Docker daemon to be ready..."
+    local docker_ready=false
+    for i in {1..10}; do
+        if docker info &>/dev/null; then
+            docker_ready=true
+            break
+        fi
+        log "Docker not ready, waiting... ($i/10)"
+        sleep 2
+    done
+    
+    if [[ "$docker_ready" != "true" ]]; then
+        error "Docker daemon is not ready after waiting"
+        return 1
+    fi
+    
     # Run tests
     local failed=0
     

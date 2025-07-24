@@ -102,12 +102,27 @@ log "Running integration tests..."
 echo
 
 # 1. Check Docker availability and run appropriate test
-if command -v docker &> /dev/null && docker info &>/dev/null; then
+check_docker_ready() {
+    if ! command -v docker &> /dev/null; then
+        return 1
+    fi
+    
+    # Wait for Docker daemon to be ready
+    for i in {1..5}; do
+        if docker info &>/dev/null; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
+if check_docker_ready; then
     log "Docker is available, running full integration test"
-    run_test "Full Integration Test" "cd tests/integration && ./simple_integration_test.sh"
+    run_test "Full Integration Test" "cd \"$SCRIPT_DIR/tests/integration\" && ./simple_integration_test.sh"
 else
     log "Docker not available, running minimal integration test"
-    run_test "Minimal Integration Test" "cd tests/integration && ./minimal_integration_test.sh"
+    run_test "Minimal Integration Test" "cd \"$SCRIPT_DIR/tests/integration\" && ./minimal_integration_test.sh"
 fi
 
 # 2. Configuration Tests
