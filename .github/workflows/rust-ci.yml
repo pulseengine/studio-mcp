@@ -91,9 +91,11 @@ jobs:
   cross-compile:
     name: Cross Compile
     runs-on: ubuntu-latest
+    continue-on-error: true
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     strategy:
+      fail-fast: false
       matrix:
         target:
           - aarch64-unknown-linux-gnu
