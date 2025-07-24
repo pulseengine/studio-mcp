@@ -26,6 +26,13 @@ async-trait = { workspace = true }
 studio-cli-manager = { path = "../studio-cli-manager" }
 studio-mcp-shared = { path = "../studio-mcp-shared" }
 
+[dev-dependencies]
+assert_cmd = "2.0"
+tempfile = "3.0"
+wiremock = "0.6"
+tokio-test = "0.4"
+predicates = "3.0"
+
 [features]
 default = []
 development = ["tracing-subscriber/json"]
