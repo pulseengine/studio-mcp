@@ -111,21 +111,21 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    // Create default configuration with mock server connection
+    // Create default configuration with WindRiver Studio connection
     let mut connections = HashMap::new();
     connections.insert(
-        "mock_studio".to_string(),
+        "windriver_studio".to_string(),
         StudioConnection {
-            name: "Mock Studio Server".to_string(),
-            url: "http://localhost:8080".to_string(),
-            username: Some("admin".to_string()),
+            name: "WindRiver Studio".to_string(),
+            url: "https://studio.windriver.com".to_string(),
+            username: Some("your_username".to_string()),
             token: None,
         },
     );
 
     let config = StudioConfig {
         connections,
-        default_connection: Some("mock_studio".to_string()),
+        default_connection: Some("windriver_studio".to_string()),
         cli: CliConfig::default(),
         cache: CacheConfig::default(),
         logging: LoggingConfig::default(),
@@ -140,15 +140,18 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
             );
             println!();
             println!("Default configuration includes:");
-            println!("  • Mock Studio server connection (localhost:8080)");
+            println!("  • WindRiver Studio connection (requires authentication)");
             println!("  • Optimized timeout settings for different operations");
             println!("  • Debug logging enabled");
             println!();
-            println!("To start the mock server for testing:");
-            println!("  cd mock-studio-server && docker-compose up -d");
+            println!("Update the configuration with your credentials:");
+            println!("  • Set your WindRiver Studio username");
+            println!("  • Configure authentication token (if required)");
             println!();
             println!("To start the MCP server:");
             println!("  {} {}", args[0], config_path);
+            println!();
+            println!("For testing, use: cargo test");
             Ok(())
         }
         Err(e) => {
