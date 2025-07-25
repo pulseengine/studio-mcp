@@ -4,10 +4,10 @@ use serde_json::Value;
 use std::process::Command as StdCommand;
 use tempfile::NamedTempFile;
 
-mod mock_studio_server;
 mod mock_plm_server;
-use mock_studio_server::MockStudioServer;
+mod mock_studio_server;
 use mock_plm_server::MockPlmServer;
+use mock_studio_server::MockStudioServer;
 
 /// Test the binary exists and can be executed
 #[test]
@@ -139,7 +139,8 @@ async fn test_windriver_studio_mcp_integration() {
     let config_path = config_path.to_str().unwrap();
 
     // Create config with mock server URL
-    let config_content = format!(r#"{{
+    let config_content = format!(
+        r#"{{
         "connections": {{
             "mock_studio": {{
                 "name": "mock_studio",
@@ -173,7 +174,9 @@ async fn test_windriver_studio_mcp_integration() {
             "file_logging": false,
             "log_file": null
         }}
-    }}"#, mock_server.base_url);
+    }}"#,
+        mock_server.base_url
+    );
 
     std::fs::write(config_path, config_content).unwrap();
 
@@ -394,7 +397,10 @@ async fn test_oauth_authentication_flow() {
 
     // Test OIDC discovery
     let discovery_response = client
-        .get(&format!("{}/.well-known/openid_configuration", mock_server.base_url))
+        .get(&format!(
+            "{}/.well-known/openid_configuration",
+            mock_server.base_url
+        ))
         .send()
         .await
         .unwrap();
@@ -408,7 +414,10 @@ async fn test_oauth_authentication_flow() {
 
     // Test token exchange
     let token_response = client
-        .post(&format!("{}/auth/realms/studio/protocol/openid-connect/token", mock_server.base_url))
+        .post(&format!(
+            "{}/auth/realms/studio/protocol/openid-connect/token",
+            mock_server.base_url
+        ))
         .form(&[
             ("grant_type", "authorization_code"),
             ("code", "mock_auth_code"),
@@ -429,8 +438,14 @@ async fn test_oauth_authentication_flow() {
 
     // Test userinfo endpoint
     let userinfo_response = client
-        .get(&format!("{}/auth/realms/studio/protocol/openid-connect/userinfo", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token_data["access_token"].as_str().unwrap()))
+        .get(&format!(
+            "{}/auth/realms/studio/protocol/openid-connect/userinfo",
+            mock_server.base_url
+        ))
+        .header(
+            "authorization",
+            format!("Bearer {}", token_data["access_token"].as_str().unwrap()),
+        )
         .send()
         .await
         .unwrap();
@@ -556,16 +571,17 @@ async fn test_plm_comprehensive_integration() {
     let types: Value = types_response.json().await.unwrap();
     assert_eq!(types["status"], "success");
     assert!(types["data"].is_array());
-    
+
     // Verify comprehensive pipeline types
     let pipeline_types = types["data"].as_array().unwrap();
     assert!(pipeline_types.len() >= 20); // Should have 20+ pipeline types
-    
+
     // Check for key pipeline types from PLM analysis
-    let type_names: Vec<String> = pipeline_types.iter()
+    let type_names: Vec<String> = pipeline_types
+        .iter()
         .map(|t| t["name"].as_str().unwrap().to_string())
         .collect();
-    
+
     assert!(type_names.contains(&"VxWorks Kernel Build".to_string()));
     assert!(type_names.contains(&"Linux Application Build".to_string()));
     assert!(type_names.contains(&"ARM Cross-Compilation".to_string()));
@@ -592,12 +608,15 @@ async fn test_plm_comprehensive_integration() {
     let created_pipeline: Value = create_response.json().await.unwrap();
     assert_eq!(created_pipeline["status"], "success");
     assert!(created_pipeline["data"]["id"].is_string());
-    
+
     let pipeline_id = created_pipeline["data"]["id"].as_str().unwrap();
 
     // Test pipeline execution
     let run_response = client
-        .post(&format!("{}/api/plm/pipelines/{}/runs", plm_server.base_url, pipeline_id))
+        .post(&format!(
+            "{}/api/plm/pipelines/{}/runs",
+            plm_server.base_url, pipeline_id
+        ))
         .json(&serde_json::json!({
             "trigger": "manual",
             "parameters": {
@@ -613,7 +632,7 @@ async fn test_plm_comprehensive_integration() {
     let run_result: Value = run_response.json().await.unwrap();
     assert_eq!(run_result["status"], "success");
     assert!(run_result["data"]["run_id"].is_string());
-    
+
     let run_id = run_result["data"]["run_id"].as_str().unwrap();
 
     // Give the mock pipeline time to progress through stages
@@ -630,13 +649,14 @@ async fn test_plm_comprehensive_integration() {
     let run_status: Value = status_response.json().await.unwrap();
     assert_eq!(run_status["status"], "success");
     assert!(run_status["data"]["tasks"].is_array());
-    
+
     // Verify build lifecycle tasks
     let tasks = run_status["data"]["tasks"].as_array().unwrap();
-    let task_names: Vec<String> = tasks.iter()
+    let task_names: Vec<String> = tasks
+        .iter()
         .map(|t| t["name"].as_str().unwrap().to_string())
         .collect();
-    
+
     assert!(task_names.contains(&"checkout".to_string()));
     assert!(task_names.contains(&"configure".to_string()));
     assert!(task_names.contains(&"compile".to_string()));
@@ -718,7 +738,10 @@ async fn test_plm_error_scenarios() {
 
     // Run the failing pipeline
     let run_response = client
-        .post(&format!("{}/api/plm/pipelines/{}/runs", plm_server.base_url, pipeline_id))
+        .post(&format!(
+            "{}/api/plm/pipelines/{}/runs",
+            plm_server.base_url, pipeline_id
+        ))
         .json(&serde_json::json!({
             "trigger": "manual"
         }))
@@ -740,30 +763,41 @@ async fn test_plm_error_scenarios() {
         .unwrap();
 
     let run_status: Value = status_response.json().await.unwrap();
-    
+
     // Should show failure in one of the tasks
     let tasks = run_status["data"]["tasks"].as_array().unwrap();
-    let has_failure = tasks.iter().any(|task| 
-        task["status"].as_str().unwrap_or("") == "Failed"
-    );
+    let has_failure = tasks
+        .iter()
+        .any(|task| task["status"].as_str().unwrap_or("") == "Failed");
     assert!(has_failure, "Expected at least one task to fail");
 
     // Test resource exhaustion scenario
     let resource_limit_response = client
-        .get(&format!("{}/api/plm/resources?scenario=resource_exhaustion", plm_server.base_url))
+        .get(&format!(
+            "{}/api/plm/resources?scenario=resource_exhaustion",
+            plm_server.base_url
+        ))
         .send()
         .await
         .unwrap();
 
     assert_eq!(resource_limit_response.status(), 200);
     let exhausted_resources: Value = resource_limit_response.json().await.unwrap();
-    
+
     // Should show high resource usage
     let cpu_usage = exhausted_resources["data"]["cpu_usage"].as_f64().unwrap();
-    let memory_usage = exhausted_resources["data"]["memory_usage"].as_f64().unwrap();
-    
-    assert!(cpu_usage > 90.0, "CPU usage should be high in exhaustion scenario");
-    assert!(memory_usage > 90.0, "Memory usage should be high in exhaustion scenario");
+    let memory_usage = exhausted_resources["data"]["memory_usage"]
+        .as_f64()
+        .unwrap();
+
+    assert!(
+        cpu_usage > 90.0,
+        "CPU usage should be high in exhaustion scenario"
+    );
+    assert!(
+        memory_usage > 90.0,
+        "Memory usage should be high in exhaustion scenario"
+    );
 }
 
 /// Test PLM integration with external services

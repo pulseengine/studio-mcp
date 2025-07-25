@@ -1,5 +1,5 @@
 //! Comprehensive mock WindRiver Studio server based on reverse engineering analysis
-//! 
+//!
 //! This mock server simulates the complete WindRiver Studio MCP protocol including:
 //! - OAuth 2.0/OIDC authentication with JWT tokens
 //! - Multi-service resource providers (MCP, VLAB, Artifacts, Schedule)
@@ -121,7 +121,7 @@ impl MockStudioServer {
     pub async fn new() -> Self {
         let server = MockServer::start().await;
         let base_url = server.uri();
-        
+
         let mock_server = Self {
             server,
             base_url,
@@ -131,7 +131,7 @@ impl MockStudioServer {
 
         // Initialize mock data
         mock_server.initialize_mock_data().await;
-        
+
         // Setup all API endpoints
         mock_server.setup_auth_endpoints().await;
         mock_server.setup_mcp_endpoints().await;
@@ -141,14 +141,14 @@ impl MockStudioServer {
         mock_server.setup_vlab_endpoints().await;
         mock_server.setup_schedule_endpoints().await;
         mock_server.setup_user_management_endpoints().await;
-        
+
         mock_server
     }
 
     /// Initialize mock data for testing
     async fn initialize_mock_data(&self) {
         let mut resources = self.resources.write().await;
-        
+
         // Sample artifacts
         resources.artifacts.push(Artifact {
             id: "artifact-001".to_string(),
@@ -251,7 +251,10 @@ impl MockStudioServer {
         // User info endpoint
         Mock::given(method("GET"))
             .and(path("/auth/realms/studio/protocol/openid-connect/userinfo"))
-            .and(header("authorization", "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock_token"))
+            .and(header(
+                "authorization",
+                "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock_token",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "sub": "user-001",
                 "username": "developer",
@@ -287,7 +290,10 @@ impl MockStudioServer {
         // MCP resources list endpoint - only with valid authorization
         Mock::given(method("GET"))
             .and(path_regex(r"^/api/v[1-5]/resources"))
-            .and(header("authorization", "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock_token"))
+            .and(header(
+                "authorization",
+                "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock_token",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "data": [
                     {
@@ -414,7 +420,7 @@ impl MockStudioServer {
                         "capabilities": ["debug", "profiling", "network"]
                     },
                     {
-                        "id": "target-002", 
+                        "id": "target-002",
                         "name": "linux-qemu-arm",
                         "type": "emulator",
                         "architecture": "aarch64",
@@ -485,7 +491,7 @@ impl MockStudioServer {
                         }
                     }
                 ],
-                "status": "success" 
+                "status": "success"
             })))
             .mount(&self.server)
             .await;
@@ -533,7 +539,7 @@ impl MockStudioServer {
                 "data": [
                     {
                         "id": "user-001",
-                        "username": "developer", 
+                        "username": "developer",
                         "email": "developer@windriver.com",
                         "first_name": "John",
                         "last_name": "Developer",
@@ -630,18 +636,24 @@ mod tests {
 
         // Test OIDC discovery
         let response = client
-            .get(&format!("{}/.well-known/openid_configuration", mock_server.base_url))
+            .get(&format!(
+                "{}/.well-known/openid_configuration",
+                mock_server.base_url
+            ))
             .send()
             .await
             .unwrap();
-        
+
         assert_eq!(response.status(), 200);
         let discovery: Value = response.json().await.unwrap();
         assert!(discovery.get("token_endpoint").is_some());
 
         // Test token exchange
         let token_response = client
-            .post(&format!("{}/auth/realms/studio/protocol/openid-connect/token", mock_server.base_url))
+            .post(&format!(
+                "{}/auth/realms/studio/protocol/openid-connect/token",
+                mock_server.base_url
+            ))
             .form(&[
                 ("grant_type", "authorization_code"),
                 ("code", "mock_auth_code"),

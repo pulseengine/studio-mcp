@@ -1,18 +1,18 @@
 //! Comprehensive PLM (Pipeline Management) mock server
-//! 
+//!
 //! This module provides a sophisticated simulation of WindRiver Studio's Pipeline Management
 //! system, including 20+ pipeline types, complete build lifecycle, realistic timing,
 //! error scenarios, and resource management.
 
+use chrono::{DateTime, Duration, Utc};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 use wiremock::{
     matchers::{method, path, path_regex, query_param},
     Mock, MockServer, ResponseTemplate,
 };
-use chrono::{DateTime, Duration, Utc};
-use uuid::Uuid;
 
 /// Comprehensive PLM mock server
 pub struct MockPlmServer {
@@ -54,35 +54,35 @@ pub enum PipelineType {
     VxWorksBootloader,
     VxWorksDriver,
     VxWorksSmp,
-    
+
     // Linux Pipelines
     LinuxKernel,
     LinuxUserspace,
     LinuxDriver,
     LinuxContainer,
     LinuxEmbedded,
-    
+
     // Cross-compilation Pipelines
     CrossCompileArm,
     CrossCompileX86,
     CrossCompileMips,
     CrossCompilePowerPc,
     CrossCompileRiscV,
-    
+
     // Application Pipelines
     CppApplication,
     CApplication,
     PythonApplication,
     JavaApplication,
     GoApplication,
-    
+
     // Testing Pipelines
     UnitTest,
     IntegrationTest,
     PerformanceTest,
     RegressionTest,
     HardwareInLoop,
-    
+
     // Deployment Pipelines
     ProductionDeploy,
     StagingDeploy,
@@ -244,7 +244,7 @@ impl MockPlmServer {
     pub async fn new() -> Self {
         let server = MockServer::start().await;
         let base_url = server.uri();
-        
+
         let mock_server = Self {
             server,
             base_url,
@@ -256,7 +256,7 @@ impl MockPlmServer {
 
         // Initialize with comprehensive pipeline data
         mock_server.initialize_pipeline_data().await;
-        
+
         // Setup all PLM endpoints
         mock_server.setup_pipeline_endpoints().await;
         mock_server.setup_run_endpoints().await;
@@ -264,7 +264,7 @@ impl MockPlmServer {
         mock_server.setup_artifact_endpoints().await;
         mock_server.setup_monitoring_endpoints().await;
         mock_server.setup_integration_endpoints().await;
-        
+
         mock_server
     }
 
@@ -273,326 +273,375 @@ impl MockPlmServer {
         let mut pipelines = self.pipelines.write().await;
         let mut runs = self.runs.write().await;
         let mut artifacts = self.artifacts.write().await;
-        
+
         // VxWorks Pipelines
-        pipelines.insert("vxworks-kernel-001".to_string(), Pipeline {
-            id: "vxworks-kernel-001".to_string(),
-            name: "VxWorks Kernel Build".to_string(),
-            pipeline_type: PipelineType::VxWorksKernel,
-            description: "Build VxWorks 7 kernel for ARM64 targets".to_string(),
-            owner: "kernel-team@windriver.com".to_string(),
-            created_at: Utc::now() - Duration::days(30),
-            updated_at: Utc::now() - Duration::hours(2),
-            status: PipelineStatus::Active,
-            tasks: vec![
-                PipelineTask {
-                    name: "checkout".to_string(),
-                    task_type: TaskType::Checkout,
-                    description: "Checkout VxWorks kernel source".to_string(),
-                    estimated_duration_seconds: 120,
-                    dependencies: vec![],
-                    parallel_group: None,
-                    retry_count: 3,
-                    timeout_seconds: 300,
-                },
-                PipelineTask {
-                    name: "configure".to_string(),
-                    task_type: TaskType::Configure,
-                    description: "Configure kernel build options".to_string(),
-                    estimated_duration_seconds: 300,
-                    dependencies: vec!["checkout".to_string()],
-                    parallel_group: None,
-                    retry_count: 2,
-                    timeout_seconds: 600,
-                },
-                PipelineTask {
-                    name: "compile".to_string(),
-                    task_type: TaskType::Compile,
-                    description: "Compile kernel modules".to_string(),
-                    estimated_duration_seconds: 1800,
-                    dependencies: vec!["configure".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 3600,
-                },
-                PipelineTask {
-                    name: "link".to_string(),
-                    task_type: TaskType::Link,
-                    description: "Link kernel image".to_string(),
-                    estimated_duration_seconds: 180,
-                    dependencies: vec!["compile".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 300,
-                },
-                PipelineTask {
-                    name: "test".to_string(),
-                    task_type: TaskType::Test,
-                    description: "Run kernel unit tests".to_string(),
-                    estimated_duration_seconds: 600,
-                    dependencies: vec!["link".to_string()],
-                    parallel_group: Some("testing".to_string()),
-                    retry_count: 2,
-                    timeout_seconds: 900,
-                },
-                PipelineTask {
-                    name: "package".to_string(),
-                    task_type: TaskType::Package,
-                    description: "Package kernel artifacts".to_string(),
-                    estimated_duration_seconds: 120,
-                    dependencies: vec!["test".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 300,
-                },
-            ],
-            parameters: [
-                ("TARGET_ARCH".to_string(), "arm64".to_string()),
-                ("BUILD_TYPE".to_string(), "release".to_string()),
-                ("OPTIMIZATION".to_string(), "O2".to_string()),
-            ].iter().cloned().collect(),
-            success_rate: 0.94,
-            avg_duration_seconds: 3220,
-            last_run_id: Some("run-vxk-001".to_string()),
-            tags: vec!["vxworks".to_string(), "kernel".to_string(), "arm64".to_string()],
-        });
+        pipelines.insert(
+            "vxworks-kernel-001".to_string(),
+            Pipeline {
+                id: "vxworks-kernel-001".to_string(),
+                name: "VxWorks Kernel Build".to_string(),
+                pipeline_type: PipelineType::VxWorksKernel,
+                description: "Build VxWorks 7 kernel for ARM64 targets".to_string(),
+                owner: "kernel-team@windriver.com".to_string(),
+                created_at: Utc::now() - Duration::days(30),
+                updated_at: Utc::now() - Duration::hours(2),
+                status: PipelineStatus::Active,
+                tasks: vec![
+                    PipelineTask {
+                        name: "checkout".to_string(),
+                        task_type: TaskType::Checkout,
+                        description: "Checkout VxWorks kernel source".to_string(),
+                        estimated_duration_seconds: 120,
+                        dependencies: vec![],
+                        parallel_group: None,
+                        retry_count: 3,
+                        timeout_seconds: 300,
+                    },
+                    PipelineTask {
+                        name: "configure".to_string(),
+                        task_type: TaskType::Configure,
+                        description: "Configure kernel build options".to_string(),
+                        estimated_duration_seconds: 300,
+                        dependencies: vec!["checkout".to_string()],
+                        parallel_group: None,
+                        retry_count: 2,
+                        timeout_seconds: 600,
+                    },
+                    PipelineTask {
+                        name: "compile".to_string(),
+                        task_type: TaskType::Compile,
+                        description: "Compile kernel modules".to_string(),
+                        estimated_duration_seconds: 1800,
+                        dependencies: vec!["configure".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 3600,
+                    },
+                    PipelineTask {
+                        name: "link".to_string(),
+                        task_type: TaskType::Link,
+                        description: "Link kernel image".to_string(),
+                        estimated_duration_seconds: 180,
+                        dependencies: vec!["compile".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 300,
+                    },
+                    PipelineTask {
+                        name: "test".to_string(),
+                        task_type: TaskType::Test,
+                        description: "Run kernel unit tests".to_string(),
+                        estimated_duration_seconds: 600,
+                        dependencies: vec!["link".to_string()],
+                        parallel_group: Some("testing".to_string()),
+                        retry_count: 2,
+                        timeout_seconds: 900,
+                    },
+                    PipelineTask {
+                        name: "package".to_string(),
+                        task_type: TaskType::Package,
+                        description: "Package kernel artifacts".to_string(),
+                        estimated_duration_seconds: 120,
+                        dependencies: vec!["test".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 300,
+                    },
+                ],
+                parameters: [
+                    ("TARGET_ARCH".to_string(), "arm64".to_string()),
+                    ("BUILD_TYPE".to_string(), "release".to_string()),
+                    ("OPTIMIZATION".to_string(), "O2".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
+                success_rate: 0.94,
+                avg_duration_seconds: 3220,
+                last_run_id: Some("run-vxk-001".to_string()),
+                tags: vec![
+                    "vxworks".to_string(),
+                    "kernel".to_string(),
+                    "arm64".to_string(),
+                ],
+            },
+        );
 
         // Linux Embedded Pipeline
-        pipelines.insert("linux-embedded-001".to_string(), Pipeline {
-            id: "linux-embedded-001".to_string(),
-            name: "Linux Embedded System".to_string(),
-            pipeline_type: PipelineType::LinuxEmbedded,
-            description: "Build custom Linux for embedded ARM devices".to_string(),
-            owner: "embedded-team@windriver.com".to_string(),
-            created_at: Utc::now() - Duration::days(45),
-            updated_at: Utc::now() - Duration::hours(6),
-            status: PipelineStatus::Active,
-            tasks: vec![
-                PipelineTask {
-                    name: "yocto-setup".to_string(),
-                    task_type: TaskType::Configure,
-                    description: "Setup Yocto build environment".to_string(),
-                    estimated_duration_seconds: 600,
-                    dependencies: vec![],
-                    parallel_group: None,
-                    retry_count: 2,
-                    timeout_seconds: 900,
-                },
-                PipelineTask {
-                    name: "kernel-build".to_string(),
-                    task_type: TaskType::Compile,
-                    description: "Build Linux kernel".to_string(),
-                    estimated_duration_seconds: 2400,
-                    dependencies: vec!["yocto-setup".to_string()],
-                    parallel_group: Some("build".to_string()),
-                    retry_count: 1,
-                    timeout_seconds: 3600,
-                },
-                PipelineTask {
-                    name: "rootfs-build".to_string(),
-                    task_type: TaskType::Compile,
-                    description: "Build root filesystem".to_string(),
-                    estimated_duration_seconds: 1800,
-                    dependencies: vec!["yocto-setup".to_string()],
-                    parallel_group: Some("build".to_string()),
-                    retry_count: 1,
-                    timeout_seconds: 2700,
-                },
-                PipelineTask {
-                    name: "image-create".to_string(),
-                    task_type: TaskType::Package,
-                    description: "Create bootable image".to_string(),
-                    estimated_duration_seconds: 300,
-                    dependencies: vec!["kernel-build".to_string(), "rootfs-build".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 600,
-                },
-            ],
-            parameters: [
-                ("MACHINE".to_string(), "raspberrypi4".to_string()),
-                ("DISTRO".to_string(), "poky".to_string()),
-                ("IMAGE_FEATURES".to_string(), "read-only-rootfs".to_string()),
-            ].iter().cloned().collect(),
-            success_rate: 0.87,
-            avg_duration_seconds: 5100,
-            last_run_id: Some("run-linux-emb-001".to_string()),
-            tags: vec!["linux".to_string(), "embedded".to_string(), "yocto".to_string()],
-        });
+        pipelines.insert(
+            "linux-embedded-001".to_string(),
+            Pipeline {
+                id: "linux-embedded-001".to_string(),
+                name: "Linux Embedded System".to_string(),
+                pipeline_type: PipelineType::LinuxEmbedded,
+                description: "Build custom Linux for embedded ARM devices".to_string(),
+                owner: "embedded-team@windriver.com".to_string(),
+                created_at: Utc::now() - Duration::days(45),
+                updated_at: Utc::now() - Duration::hours(6),
+                status: PipelineStatus::Active,
+                tasks: vec![
+                    PipelineTask {
+                        name: "yocto-setup".to_string(),
+                        task_type: TaskType::Configure,
+                        description: "Setup Yocto build environment".to_string(),
+                        estimated_duration_seconds: 600,
+                        dependencies: vec![],
+                        parallel_group: None,
+                        retry_count: 2,
+                        timeout_seconds: 900,
+                    },
+                    PipelineTask {
+                        name: "kernel-build".to_string(),
+                        task_type: TaskType::Compile,
+                        description: "Build Linux kernel".to_string(),
+                        estimated_duration_seconds: 2400,
+                        dependencies: vec!["yocto-setup".to_string()],
+                        parallel_group: Some("build".to_string()),
+                        retry_count: 1,
+                        timeout_seconds: 3600,
+                    },
+                    PipelineTask {
+                        name: "rootfs-build".to_string(),
+                        task_type: TaskType::Compile,
+                        description: "Build root filesystem".to_string(),
+                        estimated_duration_seconds: 1800,
+                        dependencies: vec!["yocto-setup".to_string()],
+                        parallel_group: Some("build".to_string()),
+                        retry_count: 1,
+                        timeout_seconds: 2700,
+                    },
+                    PipelineTask {
+                        name: "image-create".to_string(),
+                        task_type: TaskType::Package,
+                        description: "Create bootable image".to_string(),
+                        estimated_duration_seconds: 300,
+                        dependencies: vec!["kernel-build".to_string(), "rootfs-build".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 600,
+                    },
+                ],
+                parameters: [
+                    ("MACHINE".to_string(), "raspberrypi4".to_string()),
+                    ("DISTRO".to_string(), "poky".to_string()),
+                    ("IMAGE_FEATURES".to_string(), "read-only-rootfs".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
+                success_rate: 0.87,
+                avg_duration_seconds: 5100,
+                last_run_id: Some("run-linux-emb-001".to_string()),
+                tags: vec![
+                    "linux".to_string(),
+                    "embedded".to_string(),
+                    "yocto".to_string(),
+                ],
+            },
+        );
 
         // Cross-compilation Pipeline
-        pipelines.insert("cross-compile-arm-001".to_string(), Pipeline {
-            id: "cross-compile-arm-001".to_string(),
-            name: "ARM Cross-Compilation".to_string(),
-            pipeline_type: PipelineType::CrossCompileArm,
-            description: "Cross-compile applications for ARM targets".to_string(),
-            owner: "toolchain-team@windriver.com".to_string(),
-            created_at: Utc::now() - Duration::days(20),
-            updated_at: Utc::now() - Duration::hours(1),
-            status: PipelineStatus::Active,
-            tasks: vec![
-                PipelineTask {
-                    name: "toolchain-setup".to_string(),
-                    task_type: TaskType::Configure,
-                    description: "Setup ARM cross-compilation toolchain".to_string(),
-                    estimated_duration_seconds: 180,
-                    dependencies: vec![],
-                    parallel_group: None,
-                    retry_count: 2,
-                    timeout_seconds: 300,
-                },
-                PipelineTask {
-                    name: "cross-compile".to_string(),
-                    task_type: TaskType::Compile,
-                    description: "Cross-compile for ARM target".to_string(),
-                    estimated_duration_seconds: 900,
-                    dependencies: vec!["toolchain-setup".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 1800,
-                },
-                PipelineTask {
-                    name: "strip-symbols".to_string(),
-                    task_type: TaskType::Package,
-                    description: "Strip debug symbols for release".to_string(),
-                    estimated_duration_seconds: 60,
-                    dependencies: vec!["cross-compile".to_string()],
-                    parallel_group: None,
-                    retry_count: 1,
-                    timeout_seconds: 120,
-                },
-            ],
-            parameters: [
-                ("TARGET_TRIPLE".to_string(), "arm-linux-gnueabihf".to_string()),
-                ("SYSROOT".to_string(), "/opt/arm-sysroot".to_string()),
-                ("STRIP_SYMBOLS".to_string(), "true".to_string()),
-            ].iter().cloned().collect(),
-            success_rate: 0.91,
-            avg_duration_seconds: 1140,
-            last_run_id: Some("run-cross-arm-001".to_string()),
-            tags: vec!["cross-compile".to_string(), "arm".to_string(), "toolchain".to_string()],
-        });
+        pipelines.insert(
+            "cross-compile-arm-001".to_string(),
+            Pipeline {
+                id: "cross-compile-arm-001".to_string(),
+                name: "ARM Cross-Compilation".to_string(),
+                pipeline_type: PipelineType::CrossCompileArm,
+                description: "Cross-compile applications for ARM targets".to_string(),
+                owner: "toolchain-team@windriver.com".to_string(),
+                created_at: Utc::now() - Duration::days(20),
+                updated_at: Utc::now() - Duration::hours(1),
+                status: PipelineStatus::Active,
+                tasks: vec![
+                    PipelineTask {
+                        name: "toolchain-setup".to_string(),
+                        task_type: TaskType::Configure,
+                        description: "Setup ARM cross-compilation toolchain".to_string(),
+                        estimated_duration_seconds: 180,
+                        dependencies: vec![],
+                        parallel_group: None,
+                        retry_count: 2,
+                        timeout_seconds: 300,
+                    },
+                    PipelineTask {
+                        name: "cross-compile".to_string(),
+                        task_type: TaskType::Compile,
+                        description: "Cross-compile for ARM target".to_string(),
+                        estimated_duration_seconds: 900,
+                        dependencies: vec!["toolchain-setup".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 1800,
+                    },
+                    PipelineTask {
+                        name: "strip-symbols".to_string(),
+                        task_type: TaskType::Package,
+                        description: "Strip debug symbols for release".to_string(),
+                        estimated_duration_seconds: 60,
+                        dependencies: vec!["cross-compile".to_string()],
+                        parallel_group: None,
+                        retry_count: 1,
+                        timeout_seconds: 120,
+                    },
+                ],
+                parameters: [
+                    (
+                        "TARGET_TRIPLE".to_string(),
+                        "arm-linux-gnueabihf".to_string(),
+                    ),
+                    ("SYSROOT".to_string(), "/opt/arm-sysroot".to_string()),
+                    ("STRIP_SYMBOLS".to_string(), "true".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
+                success_rate: 0.91,
+                avg_duration_seconds: 1140,
+                last_run_id: Some("run-cross-arm-001".to_string()),
+                tags: vec![
+                    "cross-compile".to_string(),
+                    "arm".to_string(),
+                    "toolchain".to_string(),
+                ],
+            },
+        );
 
         // Add sample pipeline run
         let now = Utc::now();
-        runs.insert("run-vxk-001".to_string(), PipelineRun {
-            id: "run-vxk-001".to_string(),
-            pipeline_id: "vxworks-kernel-001".to_string(),
-            pipeline_name: "VxWorks Kernel Build".to_string(),
-            run_number: 142,
-            status: RunStatus::Running,
-            started_at: now - Duration::minutes(15),
-            completed_at: None,
-            duration_seconds: None,
-            triggered_by: "jenkins@windriver.com".to_string(),
-            parameters: [
-                ("TARGET_ARCH".to_string(), "arm64".to_string()),
-                ("BUILD_TYPE".to_string(), "debug".to_string()),
-            ].iter().cloned().collect(),
-            tasks: vec![
-                TaskRun {
-                    name: "checkout".to_string(),
-                    status: RunStatus::Success,
-                    started_at: Some(now - Duration::minutes(15)),
-                    completed_at: Some(now - Duration::minutes(13)),
-                    duration_seconds: Some(120),
-                    exit_code: Some(0),
-                    retry_attempt: 0,
-                    artifacts: vec!["source.tar.gz".to_string()],
-                    resource_usage: ResourceUsage {
-                        cpu_usage_percent: 25.0,
-                        memory_usage_mb: 256,
-                        disk_usage_mb: 1024,
-                        network_io_mb: 512,
-                        peak_memory_mb: 300,
+        runs.insert(
+            "run-vxk-001".to_string(),
+            PipelineRun {
+                id: "run-vxk-001".to_string(),
+                pipeline_id: "vxworks-kernel-001".to_string(),
+                pipeline_name: "VxWorks Kernel Build".to_string(),
+                run_number: 142,
+                status: RunStatus::Running,
+                started_at: now - Duration::minutes(15),
+                completed_at: None,
+                duration_seconds: None,
+                triggered_by: "jenkins@windriver.com".to_string(),
+                parameters: [
+                    ("TARGET_ARCH".to_string(), "arm64".to_string()),
+                    ("BUILD_TYPE".to_string(), "debug".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
+                tasks: vec![
+                    TaskRun {
+                        name: "checkout".to_string(),
+                        status: RunStatus::Success,
+                        started_at: Some(now - Duration::minutes(15)),
+                        completed_at: Some(now - Duration::minutes(13)),
+                        duration_seconds: Some(120),
+                        exit_code: Some(0),
+                        retry_attempt: 0,
+                        artifacts: vec!["source.tar.gz".to_string()],
+                        resource_usage: ResourceUsage {
+                            cpu_usage_percent: 25.0,
+                            memory_usage_mb: 256,
+                            disk_usage_mb: 1024,
+                            network_io_mb: 512,
+                            peak_memory_mb: 300,
+                        },
                     },
-                },
-                TaskRun {
-                    name: "configure".to_string(),
-                    status: RunStatus::Success,
-                    started_at: Some(now - Duration::minutes(13)),
-                    completed_at: Some(now - Duration::minutes(8)),
-                    duration_seconds: Some(300),
-                    exit_code: Some(0),
-                    retry_attempt: 0,
-                    artifacts: vec!["config.mk".to_string(), "build.env".to_string()],
-                    resource_usage: ResourceUsage {
-                        cpu_usage_percent: 45.0,
-                        memory_usage_mb: 512,
-                        disk_usage_mb: 2048,
-                        network_io_mb: 128,
-                        peak_memory_mb: 600,
+                    TaskRun {
+                        name: "configure".to_string(),
+                        status: RunStatus::Success,
+                        started_at: Some(now - Duration::minutes(13)),
+                        completed_at: Some(now - Duration::minutes(8)),
+                        duration_seconds: Some(300),
+                        exit_code: Some(0),
+                        retry_attempt: 0,
+                        artifacts: vec!["config.mk".to_string(), "build.env".to_string()],
+                        resource_usage: ResourceUsage {
+                            cpu_usage_percent: 45.0,
+                            memory_usage_mb: 512,
+                            disk_usage_mb: 2048,
+                            network_io_mb: 128,
+                            peak_memory_mb: 600,
+                        },
                     },
-                },
-                TaskRun {
-                    name: "compile".to_string(),
-                    status: RunStatus::Running,
-                    started_at: Some(now - Duration::minutes(8)),
-                    completed_at: None,
-                    duration_seconds: None,
-                    exit_code: None,
-                    retry_attempt: 0,
-                    artifacts: vec![],
-                    resource_usage: ResourceUsage {
-                        cpu_usage_percent: 85.0,
-                        memory_usage_mb: 2048,
-                        disk_usage_mb: 8192,
-                        network_io_mb: 64,
-                        peak_memory_mb: 2300,
+                    TaskRun {
+                        name: "compile".to_string(),
+                        status: RunStatus::Running,
+                        started_at: Some(now - Duration::minutes(8)),
+                        completed_at: None,
+                        duration_seconds: None,
+                        exit_code: None,
+                        retry_attempt: 0,
+                        artifacts: vec![],
+                        resource_usage: ResourceUsage {
+                            cpu_usage_percent: 85.0,
+                            memory_usage_mb: 2048,
+                            disk_usage_mb: 8192,
+                            network_io_mb: 64,
+                            peak_memory_mb: 2300,
+                        },
                     },
+                ],
+                artifacts_produced: vec!["source.tar.gz".to_string(), "config.mk".to_string()],
+                resource_usage: ResourceUsage {
+                    cpu_usage_percent: 85.0,
+                    memory_usage_mb: 2816,
+                    disk_usage_mb: 11264,
+                    network_io_mb: 704,
+                    peak_memory_mb: 2300,
                 },
-            ],
-            artifacts_produced: vec!["source.tar.gz".to_string(), "config.mk".to_string()],
-            resource_usage: ResourceUsage {
-                cpu_usage_percent: 85.0,
-                memory_usage_mb: 2816,
-                disk_usage_mb: 11264,
-                network_io_mb: 704,
-                peak_memory_mb: 2300,
+                logs: vec![
+                    LogEntry {
+                        timestamp: now - Duration::minutes(15),
+                        level: LogLevel::Info,
+                        task_name: Some("checkout".to_string()),
+                        message: "Starting source checkout from git repository".to_string(),
+                        raw_line: "[INFO] checkout: Starting source checkout from git repository"
+                            .to_string(),
+                    },
+                    LogEntry {
+                        timestamp: now - Duration::minutes(8),
+                        level: LogLevel::Info,
+                        task_name: Some("compile".to_string()),
+                        message: "Compiling kernel modules [progress: 45%]".to_string(),
+                        raw_line: "[INFO] compile: Compiling kernel modules [progress: 45%]"
+                            .to_string(),
+                    },
+                    LogEntry {
+                        timestamp: now - Duration::minutes(5),
+                        level: LogLevel::Warning,
+                        task_name: Some("compile".to_string()),
+                        message: "Deprecated API usage detected in network module".to_string(),
+                        raw_line: "[WARN] compile: Deprecated API usage detected in network module"
+                            .to_string(),
+                    },
+                ],
+                error_summary: None,
             },
-            logs: vec![
-                LogEntry {
-                    timestamp: now - Duration::minutes(15),
-                    level: LogLevel::Info,
-                    task_name: Some("checkout".to_string()),
-                    message: "Starting source checkout from git repository".to_string(),
-                    raw_line: "[INFO] checkout: Starting source checkout from git repository".to_string(),
-                },
-                LogEntry {
-                    timestamp: now - Duration::minutes(8),
-                    level: LogLevel::Info,
-                    task_name: Some("compile".to_string()),
-                    message: "Compiling kernel modules [progress: 45%]".to_string(),
-                    raw_line: "[INFO] compile: Compiling kernel modules [progress: 45%]".to_string(),
-                },
-                LogEntry {
-                    timestamp: now - Duration::minutes(5),
-                    level: LogLevel::Warning,
-                    task_name: Some("compile".to_string()),
-                    message: "Deprecated API usage detected in network module".to_string(),
-                    raw_line: "[WARN] compile: Deprecated API usage detected in network module".to_string(),
-                },
-            ],
-            error_summary: None,
-        });
+        );
 
         // Add sample build artifacts
-        artifacts.insert("artifact-001".to_string(), BuildArtifact {
-            id: "artifact-001".to_string(),
-            pipeline_run_id: "run-vxk-001".to_string(),
-            name: "vxworks-kernel-arm64.bin".to_string(),
-            artifact_type: ArtifactType::Binary,
-            path: "/artifacts/vxworks/kernel/vxworks-kernel-arm64.bin".to_string(),
-            size_bytes: 8388608, // 8MB
-            checksum: "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456".to_string(),
-            created_at: now - Duration::hours(2),
-            metadata: [
-                ("target".to_string(), "arm64".to_string()),
-                ("build_type".to_string(), "release".to_string()),
-                ("compiler".to_string(), "gcc-11.2.0".to_string()),
-                ("optimization".to_string(), "O2".to_string()),
-            ].iter().cloned().collect(),
-        });
+        artifacts.insert(
+            "artifact-001".to_string(),
+            BuildArtifact {
+                id: "artifact-001".to_string(),
+                pipeline_run_id: "run-vxk-001".to_string(),
+                name: "vxworks-kernel-arm64.bin".to_string(),
+                artifact_type: ArtifactType::Binary,
+                path: "/artifacts/vxworks/kernel/vxworks-kernel-arm64.bin".to_string(),
+                size_bytes: 8388608, // 8MB
+                checksum: "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
+                    .to_string(),
+                created_at: now - Duration::hours(2),
+                metadata: [
+                    ("target".to_string(), "arm64".to_string()),
+                    ("build_type".to_string(), "release".to_string()),
+                    ("compiler".to_string(), "gcc-11.2.0".to_string()),
+                    ("optimization".to_string(), "O2".to_string()),
+                ]
+                .iter()
+                .cloned()
+                .collect(),
+            },
+        );
 
         // Initialize system resources
         let mut resources = self.resources.write().await;
@@ -601,7 +650,7 @@ impl MockPlmServer {
             available_cpu_cores: 32,
             total_memory_gb: 256,
             available_memory_gb: 128,
-            total_disk_gb: 10240, // 10TB
+            total_disk_gb: 10240,    // 10TB
             available_disk_gb: 5120, // 5TB
             active_builds: 8,
             queued_builds: 3,
@@ -1344,7 +1393,7 @@ impl MockPlmServer {
                         "run_id": "run-vxk-001"
                     },
                     {
-                        "id": "artifact-002", 
+                        "id": "artifact-002",
                         "name": "debug-symbols.tar.gz",
                         "type": "debug_info",
                         "size_bytes": 2097152,
@@ -1785,7 +1834,10 @@ mod tests {
 
         // Test pipeline start
         let response = client
-            .post(&format!("{}/api/plm/pipelines/vxworks-kernel-001/start", mock_server.base_url))
+            .post(&format!(
+                "{}/api/plm/pipelines/vxworks-kernel-001/start",
+                mock_server.base_url
+            ))
             .header("authorization", format!("Bearer {}", token))
             .json(&json!({
                 "parameters": {
@@ -1812,7 +1864,10 @@ mod tests {
 
         // Test system resources
         let response = client
-            .get(&format!("{}/api/plm/system/resources", mock_server.base_url))
+            .get(&format!(
+                "{}/api/plm/system/resources",
+                mock_server.base_url
+            ))
             .header("authorization", format!("Bearer {}", token))
             .send()
             .await
@@ -1823,7 +1878,12 @@ mod tests {
         assert_eq!(resources["status"], "success");
         assert!(resources["data"]["cpu"]["total_cores"].as_u64().unwrap() > 0);
         assert!(resources["data"]["memory"]["total_gb"].as_u64().unwrap() > 0);
-        assert!(resources["data"]["builds"]["active_builds"].as_u64().unwrap() >= 0);
+        assert!(
+            resources["data"]["builds"]["active_builds"]
+                .as_u64()
+                .unwrap()
+                >= 0
+        );
     }
 
     #[tokio::test]
@@ -1834,7 +1894,10 @@ mod tests {
 
         // Test VLAB integration
         let response = client
-            .get(&format!("{}/api/plm/integrations/vlab/targets", mock_server.base_url))
+            .get(&format!(
+                "{}/api/plm/integrations/vlab/targets",
+                mock_server.base_url
+            ))
             .header("authorization", format!("Bearer {}", token))
             .send()
             .await
