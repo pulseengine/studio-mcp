@@ -1,5 +1,5 @@
 //! PLM-specific caching layer with intelligent cache type detection
-//! 
+//!
 //! Provides PLM-aware caching that integrates with the PlmResourceProvider:
 //! - Automatic cache type detection based on PLM resource patterns
 //! - Smart invalidation for pipeline state changes
@@ -170,7 +170,10 @@ impl PlmCache {
             }
         }
 
-        debug!("Invalidated {} PLM cache entries for pattern: {}", invalidated_count, full_pattern);
+        debug!(
+            "Invalidated {} PLM cache entries for pattern: {}",
+            invalidated_count, full_pattern
+        );
     }
 
     /// Invalidate caches when pipeline state changes for a specific user
@@ -193,8 +196,10 @@ impl PlmCache {
     /// Invalidate caches when run state changes for a specific user
     pub async fn invalidate_run(&self, context: &CacheContext, run_id: &str) {
         // Invalidate run-specific caches
-        self.invalidate_pattern(context, &format!("run:{}", run_id)).await;
-        self.invalidate_pattern(context, &format!("runs/{}", run_id)).await;
+        self.invalidate_pattern(context, &format!("run:{}", run_id))
+            .await;
+        self.invalidate_pattern(context, &format!("runs/{}", run_id))
+            .await;
 
         // Invalidate dynamic run lists
         self.remove(context, "runs:list").await;
@@ -250,31 +255,34 @@ impl PlmCache {
     /// Detect cache type based on PLM resource key patterns
     fn detect_cache_type(key: &str) -> CacheType {
         // Pipeline definitions and task libraries - rarely change
-        if key.contains("definition") 
-            || key.contains("task_lib") 
+        if key.contains("definition")
+            || key.contains("task_lib")
             || key.contains("pipeline:def:")
             || key.contains("tasks:")
             || key.contains("secrets:")
             || key.contains("triggers:")
-            || key.contains("access-config:") {
+            || key.contains("access-config:")
+        {
             return CacheType::Immutable;
         }
 
         // Completed/failed runs and tasks - never change once done
-        if key.contains("completed") 
-            || key.contains("failed") 
+        if key.contains("completed")
+            || key.contains("failed")
             || key.contains("finished")
             || key.contains(":status:completed")
-            || key.contains(":status:failed") {
+            || key.contains(":status:failed")
+        {
             return CacheType::Completed;
         }
 
         // Pipeline/run lists and resource lists - change when items added/removed
-        if key.contains("list") 
+        if key.contains("list")
             || key.contains("pipelines:")
             || key.contains("runs:")
             || key.contains("resources:")
-            || key.contains("groups:") {
+            || key.contains("groups:")
+        {
             return CacheType::SemiDynamic;
         }
 
@@ -288,7 +296,11 @@ impl PlmCache {
             return;
         }
 
-        debug!("Warming PLM cache for {} pipelines (user: {})", pipeline_ids.len(), context.user_id);
+        debug!(
+            "Warming PLM cache for {} pipelines (user: {})",
+            pipeline_ids.len(),
+            context.user_id
+        );
 
         // Cache pipeline definitions (immutable)
         for pipeline_id in pipeline_ids {
@@ -307,9 +319,14 @@ impl PlmCache {
             "pipelines": pipeline_ids,
             "total": pipeline_ids.len()
         });
-        self.insert(context, "pipelines:list".to_string(), pipeline_list).await;
+        self.insert(context, "pipelines:list".to_string(), pipeline_list)
+            .await;
 
-        debug!("PLM cache warmed with {} pipeline definitions for user: {}", pipeline_ids.len(), context.user_id);
+        debug!(
+            "PLM cache warmed with {} pipeline definitions for user: {}",
+            pipeline_ids.len(),
+            context.user_id
+        );
     }
 }
 
@@ -463,14 +480,20 @@ mod tests {
     #[tokio::test]
     async fn test_plm_cache_expiration() {
         let mut config = CacheConfig::default();
-        config.custom_ttl.insert(CacheType::Dynamic, Duration::from_millis(50));
-        
+        config
+            .custom_ttl
+            .insert(CacheType::Dynamic, Duration::from_millis(50));
+
         let cache = PlmCache::with_config(config);
         let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
-        
+
         // Insert dynamic data with short TTL
         cache
-            .insert(&context, "run:events:123".to_string(), json!({"events": []}))
+            .insert(
+                &context,
+                "run:events:123".to_string(),
+                json!({"events": []}),
+            )
             .await;
 
         // Verify data exists
@@ -520,17 +543,26 @@ mod tests {
     #[tokio::test]
     async fn test_cache_context_isolation() {
         let cache = PlmCache::new();
-        let context1 = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
-        let context2 = CacheContext::new("user2".to_string(), "org1".to_string(), "dev".to_string());
+        let context1 =
+            CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
+        let context2 =
+            CacheContext::new("user2".to_string(), "org1".to_string(), "dev".to_string());
         let test_data = json!({"test": "data"});
 
         // Insert data for user1
         cache
-            .insert(&context1, "pipeline:def:test".to_string(), test_data.clone())
+            .insert(
+                &context1,
+                "pipeline:def:test".to_string(),
+                test_data.clone(),
+            )
             .await;
 
         // Verify user1 can access the data
-        assert_eq!(cache.get(&context1, "pipeline:def:test").await, Some(test_data.clone()));
+        assert_eq!(
+            cache.get(&context1, "pipeline:def:test").await,
+            Some(test_data.clone())
+        );
 
         // Verify user2 cannot access user1's data
         assert_eq!(cache.get(&context2, "pipeline:def:test").await, None);
@@ -538,11 +570,21 @@ mod tests {
         // Insert different data for user2
         let user2_data = json!({"user2": "data"});
         cache
-            .insert(&context2, "pipeline:def:test".to_string(), user2_data.clone())
+            .insert(
+                &context2,
+                "pipeline:def:test".to_string(),
+                user2_data.clone(),
+            )
             .await;
 
         // Verify both users have isolated data
-        assert_eq!(cache.get(&context1, "pipeline:def:test").await, Some(test_data));
-        assert_eq!(cache.get(&context2, "pipeline:def:test").await, Some(user2_data));
+        assert_eq!(
+            cache.get(&context1, "pipeline:def:test").await,
+            Some(test_data)
+        );
+        assert_eq!(
+            cache.get(&context2, "pipeline:def:test").await,
+            Some(user2_data)
+        );
     }
 }

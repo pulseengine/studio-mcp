@@ -1,5 +1,5 @@
 //! Intelligent caching layer for PLM resources
-//! 
+//!
 //! Implements state-aware caching with different TTL policies based on data mutability:
 //! - Immutable: Pipeline definitions, task libraries (1+ hours)
 //! - Completed: Finished runs/tasks (permanent until manual invalidation)
@@ -45,7 +45,8 @@ impl CacheContext {
 
     /// Generate cache key prefix with user context
     pub fn cache_prefix(&self) -> String {
-        format!("user:{}:org:{}:env:{}", 
+        format!(
+            "user:{}:org:{}:env:{}",
             self.sanitize_key_component(&self.user_id),
             self.sanitize_key_component(&self.org_id),
             self.sanitize_key_component(&self.environment)
@@ -82,7 +83,7 @@ impl CachedItem {
     pub fn new(data: Value, cache_type: CacheType) -> Self {
         let ttl = cache_type.default_ttl();
         let now = Instant::now();
-        
+
         Self {
             data,
             cached_at: now,
@@ -123,10 +124,10 @@ pub enum CacheType {
 impl CacheType {
     pub fn default_ttl(&self) -> Duration {
         match self {
-            CacheType::Immutable => Duration::from_secs(3600),    // 1 hour
-            CacheType::Completed => Duration::from_secs(86400),   // 24 hours (but never expires)
-            CacheType::SemiDynamic => Duration::from_secs(600),   // 10 minutes
-            CacheType::Dynamic => Duration::from_secs(60),        // 1 minute
+            CacheType::Immutable => Duration::from_secs(3600), // 1 hour
+            CacheType::Completed => Duration::from_secs(86400), // 24 hours (but never expires)
+            CacheType::SemiDynamic => Duration::from_secs(600), // 10 minutes
+            CacheType::Dynamic => Duration::from_secs(60),     // 1 minute
         }
     }
 
@@ -228,10 +229,12 @@ impl CacheStore {
 
     pub fn get(&mut self, key: &str) -> Option<Value> {
         // Check if item exists and is expired
-        let is_expired = self.items.get(key)
+        let is_expired = self
+            .items
+            .get(key)
             .map(|item| item.is_expired())
             .unwrap_or(false);
-            
+
         if is_expired {
             self.remove(key);
             return None;
@@ -328,16 +331,25 @@ mod tests {
     #[test]
     fn test_cache_store_lru() {
         let mut store = CacheStore::new(2);
-        
-        store.insert("key1".to_string(), CachedItem::new(json!(1), CacheType::Dynamic));
-        store.insert("key2".to_string(), CachedItem::new(json!(2), CacheType::Dynamic));
+
+        store.insert(
+            "key1".to_string(),
+            CachedItem::new(json!(1), CacheType::Dynamic),
+        );
+        store.insert(
+            "key2".to_string(),
+            CachedItem::new(json!(2), CacheType::Dynamic),
+        );
         assert_eq!(store.len(), 2);
 
         // Access key1 to make it more recent
         store.get("key1");
 
         // Insert key3, should evict key2 (LRU)
-        store.insert("key3".to_string(), CachedItem::new(json!(3), CacheType::Dynamic));
+        store.insert(
+            "key3".to_string(),
+            CachedItem::new(json!(3), CacheType::Dynamic),
+        );
         assert_eq!(store.len(), 2);
         assert!(store.get("key1").is_some());
         assert!(store.get("key2").is_none());
@@ -346,9 +358,18 @@ mod tests {
 
     #[test]
     fn test_cache_type_from_key() {
-        assert_eq!(CacheType::from_key("pipeline_definition:123"), CacheType::Immutable);
-        assert_eq!(CacheType::from_key("run_details:456:completed"), CacheType::Completed);
-        assert_eq!(CacheType::from_key("pipeline_list:all"), CacheType::SemiDynamic);
+        assert_eq!(
+            CacheType::from_key("pipeline_definition:123"),
+            CacheType::Immutable
+        );
+        assert_eq!(
+            CacheType::from_key("run_details:456:completed"),
+            CacheType::Completed
+        );
+        assert_eq!(
+            CacheType::from_key("pipeline_list:all"),
+            CacheType::SemiDynamic
+        );
         assert_eq!(CacheType::from_key("run_events:789"), CacheType::Dynamic);
     }
 }
