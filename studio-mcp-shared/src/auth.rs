@@ -186,17 +186,17 @@ impl TokenStorage {
     pub fn store_credentials(&self, credentials: &AuthCredentials) -> Result<()> {
         let key = credentials.storage_key();
         let entry = Entry::new(&self.service_name, &key)
-            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {e}")))?;
 
         // Serialize and encrypt credentials
-        let serialized = serde_json::to_vec(credentials).map_err(|e| StudioError::Json(e))?;
+        let serialized = serde_json::to_vec(credentials).map_err(StudioError::Json)?;
 
         let encrypted = self.encrypt_data(&serialized)?;
         let encoded = general_purpose::STANDARD.encode(&encrypted);
 
         entry
             .set_password(&encoded)
-            .map_err(|e| StudioError::Auth(format!("Failed to store credentials: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to store credentials: {e}")))?;
 
         Ok(())
     }
@@ -207,35 +207,35 @@ impl TokenStorage {
         instance_id: &str,
         environment: &str,
     ) -> Result<AuthCredentials> {
-        let key = format!("studio-mcp:{}:{}", environment, instance_id);
+        let key = format!("studio-mcp:{environment}:{instance_id}");
         let entry = Entry::new(&self.service_name, &key)
-            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {e}")))?;
 
         let encoded = entry
             .get_password()
-            .map_err(|e| StudioError::Auth(format!("Failed to retrieve credentials: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to retrieve credentials: {e}")))?;
 
         let encrypted = general_purpose::STANDARD
             .decode(encoded)
-            .map_err(|e| StudioError::Auth(format!("Failed to decode credentials: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to decode credentials: {e}")))?;
 
         let decrypted = self.decrypt_data(&encrypted)?;
 
         let credentials: AuthCredentials =
-            serde_json::from_slice(&decrypted).map_err(|e| StudioError::Json(e))?;
+            serde_json::from_slice(&decrypted).map_err(StudioError::Json)?;
 
         Ok(credentials)
     }
 
     /// Remove credentials from storage
     pub fn remove_credentials(&self, instance_id: &str, environment: &str) -> Result<()> {
-        let key = format!("studio-mcp:{}:{}", environment, instance_id);
+        let key = format!("studio-mcp:{environment}:{instance_id}");
         let entry = Entry::new(&self.service_name, &key)
-            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to create keyring entry: {e}")))?;
 
         entry
             .delete_credential()
-            .map_err(|e| StudioError::Auth(format!("Failed to remove credentials: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to remove credentials: {e}")))?;
 
         Ok(())
     }
@@ -260,7 +260,7 @@ impl TokenStorage {
         let mut buffer = data.to_vec();
         cipher
             .encrypt_in_place(nonce, b"", &mut buffer)
-            .map_err(|e| StudioError::Auth(format!("Encryption failed: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Encryption failed: {e}")))?;
 
         // Prepend nonce to encrypted data
         let mut result = nonce_bytes.to_vec();
@@ -282,7 +282,7 @@ impl TokenStorage {
         let mut buffer = ciphertext.to_vec();
         cipher
             .decrypt_in_place(nonce, b"", &mut buffer)
-            .map_err(|e| StudioError::Auth(format!("Decryption failed: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Decryption failed: {e}")))?;
 
         Ok(buffer)
     }
@@ -290,12 +290,12 @@ impl TokenStorage {
     /// Get or create encryption key
     fn get_or_create_encryption_key(service_name: &str) -> Result<[u8; 32]> {
         let key_entry = Entry::new(service_name, "encryption-key")
-            .map_err(|e| StudioError::Auth(format!("Failed to create key entry: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Failed to create key entry: {e}")))?;
 
         match key_entry.get_password() {
             Ok(encoded_key) => {
                 let key_bytes = general_purpose::STANDARD.decode(encoded_key).map_err(|e| {
-                    StudioError::Auth(format!("Failed to decode encryption key: {}", e))
+                    StudioError::Auth(format!("Failed to decode encryption key: {e}"))
                 })?;
 
                 if key_bytes.len() != 32 {
@@ -313,9 +313,9 @@ impl TokenStorage {
                 let mut key = [0u8; 32];
                 OsRng.fill_bytes(&mut key);
 
-                let encoded_key = general_purpose::STANDARD.encode(&key);
+                let encoded_key = general_purpose::STANDARD.encode(key);
                 key_entry.set_password(&encoded_key).map_err(|e| {
-                    StudioError::Auth(format!("Failed to store encryption key: {}", e))
+                    StudioError::Auth(format!("Failed to store encryption key: {e}"))
                 })?;
 
                 Ok(key)
@@ -383,7 +383,7 @@ impl AuthManager {
         environment: &str,
     ) -> Result<AuthCredentials> {
         // Check cache first
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
         if let Some(credentials) = self.credentials_cache.get(&cache_key) {
             return Ok(credentials.clone());
         }
@@ -421,7 +421,7 @@ impl AuthManager {
                 self.storage.store_credentials(&credentials)?;
 
                 // Update cache
-                let cache_key = format!("{}:{}", environment, instance_id);
+                let cache_key = format!("{environment}:{instance_id}");
                 self.credentials_cache.insert(cache_key, credentials);
 
                 return Ok(new_token);
@@ -434,7 +434,7 @@ impl AuthManager {
     /// Logout and remove stored credentials
     pub fn logout(&mut self, instance_id: &str, environment: &str) -> Result<()> {
         // Remove from cache
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
         self.credentials_cache.remove(&cache_key);
 
         // Remove from storage

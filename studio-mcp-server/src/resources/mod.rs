@@ -76,8 +76,7 @@ impl ResourceProvider {
             Some(service) => {
                 warn!("Unknown service area: {}", service);
                 Err(StudioError::ResourceNotFound(format!(
-                    "Service '{}' not implemented",
-                    service
+                    "Service '{service}' not implemented"
                 )))
             }
         }
@@ -137,8 +136,7 @@ impl ResourceProvider {
                 Ok(vec![Content::Text { text: content }])
             }
             Some(config_type) => Err(StudioError::ResourceNotFound(format!(
-                "Config type '{}' not found",
-                config_type
+                "Config type '{config_type}' not found"
             ))),
         }
     }

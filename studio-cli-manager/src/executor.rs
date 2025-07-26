@@ -56,7 +56,7 @@ impl CliExecutor {
 
         let output = match output_result {
             Ok(Ok(output)) => output,
-            Ok(Err(e)) => return Err(StudioError::Cli(format!("Command execution failed: {}", e))),
+            Ok(Err(e)) => return Err(StudioError::Cli(format!("Command execution failed: {e}"))),
             Err(_) => {
                 return Err(StudioError::Cli(format!(
                     "Command timed out after {} seconds",
@@ -137,8 +137,7 @@ impl CliExecutor {
 
         if !status.success() {
             return Err(StudioError::Cli(format!(
-                "Streaming command failed with status {}",
-                status
+                "Streaming command failed with status {status}"
             )));
         }
 

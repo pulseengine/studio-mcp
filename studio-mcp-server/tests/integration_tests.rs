@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use serde_json::Value;
 use std::process::Command as StdCommand;
 use tempfile::NamedTempFile;
@@ -209,8 +208,8 @@ async fn test_mcp_resource_operations() {
 
     // Test resource listing
     let response = client
-        .get(&format!("{}/api/v1/resources", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .get(format!("{}/api/v1/resources", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .send()
         .await
         .unwrap();
@@ -222,8 +221,8 @@ async fn test_mcp_resource_operations() {
 
     // Test license operations
     let license_response = client
-        .post(&format!("{}/license/assign", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .post(format!("{}/license/assign", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .json(&serde_json::json!({
             "license_id": "lic-001",
             "user_id": "user-001"
@@ -246,8 +245,8 @@ async fn test_vlab_integration() {
 
     // Test VLAB targets
     let targets_response = client
-        .get(&format!("{}/api/vlab/targets", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .get(format!("{}/api/vlab/targets", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .send()
         .await
         .unwrap();
@@ -267,8 +266,8 @@ async fn test_vlab_integration() {
 
     // Test reservation creation
     let reservation_response = client
-        .post(&format!("{}/api/vlab/reservations", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .post(format!("{}/api/vlab/reservations", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .json(&serde_json::json!({
             "target_id": "target-001",
             "duration": 8
@@ -292,8 +291,8 @@ async fn test_artifacts_management() {
 
     // Test artifact listing
     let artifacts_response = client
-        .get(&format!("{}/api/artifacts", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .get(format!("{}/api/artifacts", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .send()
         .await
         .unwrap();
@@ -313,8 +312,8 @@ async fn test_artifacts_management() {
 
     // Test artifact upload initiation
     let upload_response = client
-        .post(&format!("{}/api/artifacts", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .post(format!("{}/api/artifacts", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .json(&serde_json::json!({
             "name": "test-artifact.so",
             "type": "library",
@@ -339,8 +338,8 @@ async fn test_schedule_management() {
 
     // Test job listing
     let jobs_response = client
-        .get(&format!("{}/schedule/jobs", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .get(format!("{}/schedule/jobs", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .send()
         .await
         .unwrap();
@@ -366,8 +365,8 @@ async fn test_schedule_management() {
 
     // Test job creation
     let create_response = client
-        .post(&format!("{}/schedule/jobs", mock_server.base_url))
-        .header("authorization", format!("Bearer {}", token))
+        .post(format!("{}/schedule/jobs", mock_server.base_url))
+        .header("authorization", format!("Bearer {token}"))
         .json(&serde_json::json!({
             "name": "Test Build Job",
             "owner": "test-user",
@@ -397,7 +396,7 @@ async fn test_oauth_authentication_flow() {
 
     // Test OIDC discovery
     let discovery_response = client
-        .get(&format!(
+        .get(format!(
             "{}/.well-known/openid_configuration",
             mock_server.base_url
         ))
@@ -414,7 +413,7 @@ async fn test_oauth_authentication_flow() {
 
     // Test token exchange
     let token_response = client
-        .post(&format!(
+        .post(format!(
             "{}/auth/realms/studio/protocol/openid-connect/token",
             mock_server.base_url
         ))
@@ -438,7 +437,7 @@ async fn test_oauth_authentication_flow() {
 
     // Test userinfo endpoint
     let userinfo_response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/realms/studio/protocol/openid-connect/userinfo",
             mock_server.base_url
         ))
@@ -466,7 +465,7 @@ async fn test_error_handling() {
 
     // Test unauthorized access
     let unauth_response = client
-        .get(&format!("{}/api/v1/resources", mock_server.base_url))
+        .get(format!("{}/api/v1/resources", mock_server.base_url))
         .header("authorization", "Bearer invalid_token")
         .send()
         .await
@@ -479,7 +478,7 @@ async fn test_error_handling() {
 
     // Test rate limiting
     let rate_limit_response = client
-        .post(&format!("{}/api/artifacts", mock_server.base_url))
+        .post(format!("{}/api/artifacts", mock_server.base_url))
         .header("x-test-scenario", "rate_limit")
         .send()
         .await
@@ -491,7 +490,7 @@ async fn test_error_handling() {
 
     // Test server errors
     let server_error_response = client
-        .post(&format!("{}/schedule/jobs", mock_server.base_url))
+        .post(format!("{}/schedule/jobs", mock_server.base_url))
         .header("x-test-scenario", "server_error")
         .send()
         .await
@@ -562,7 +561,7 @@ async fn test_plm_comprehensive_integration() {
 
     // Test pipeline types listing
     let types_response = client
-        .get(&format!("{}/api/plm/pipeline-types", plm_server.base_url))
+        .get(format!("{}/api/plm/pipeline-types", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -590,7 +589,7 @@ async fn test_plm_comprehensive_integration() {
 
     // Test pipeline creation
     let create_response = client
-        .post(&format!("{}/api/plm/pipelines", plm_server.base_url))
+        .post(format!("{}/api/plm/pipelines", plm_server.base_url))
         .json(&serde_json::json!({
             "name": "Test VxWorks Build",
             "type": "vxworks_kernel",
@@ -613,7 +612,7 @@ async fn test_plm_comprehensive_integration() {
 
     // Test pipeline execution
     let run_response = client
-        .post(&format!(
+        .post(format!(
             "{}/api/plm/pipelines/{}/runs",
             plm_server.base_url, pipeline_id
         ))
@@ -640,7 +639,7 @@ async fn test_plm_comprehensive_integration() {
 
     // Test run status monitoring
     let status_response = client
-        .get(&format!("{}/api/plm/runs/{}", plm_server.base_url, run_id))
+        .get(format!("{}/api/plm/runs/{}", plm_server.base_url, run_id))
         .send()
         .await
         .unwrap();
@@ -670,7 +669,7 @@ async fn test_plm_resource_management() {
 
     // Test system resources monitoring
     let resources_response = client
-        .get(&format!("{}/api/plm/resources", plm_server.base_url))
+        .get(format!("{}/api/plm/resources", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -685,7 +684,7 @@ async fn test_plm_resource_management() {
 
     // Test build artifacts management
     let artifacts_response = client
-        .get(&format!("{}/api/plm/artifacts", plm_server.base_url))
+        .get(format!("{}/api/plm/artifacts", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -697,7 +696,7 @@ async fn test_plm_resource_management() {
 
     // Test pipeline metrics
     let metrics_response = client
-        .get(&format!("{}/api/plm/metrics", plm_server.base_url))
+        .get(format!("{}/api/plm/metrics", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -719,7 +718,7 @@ async fn test_plm_error_scenarios() {
 
     // Test build failure scenario
     let failure_response = client
-        .post(&format!("{}/api/plm/pipelines", plm_server.base_url))
+        .post(format!("{}/api/plm/pipelines", plm_server.base_url))
         .json(&serde_json::json!({
             "name": "Failing Build Test",
             "type": "vxworks_kernel",
@@ -738,7 +737,7 @@ async fn test_plm_error_scenarios() {
 
     // Run the failing pipeline
     let run_response = client
-        .post(&format!(
+        .post(format!(
             "{}/api/plm/pipelines/{}/runs",
             plm_server.base_url, pipeline_id
         ))
@@ -757,7 +756,7 @@ async fn test_plm_error_scenarios() {
 
     // Check run status should show failure
     let status_response = client
-        .get(&format!("{}/api/plm/runs/{}", plm_server.base_url, run_id))
+        .get(format!("{}/api/plm/runs/{}", plm_server.base_url, run_id))
         .send()
         .await
         .unwrap();
@@ -773,7 +772,7 @@ async fn test_plm_error_scenarios() {
 
     // Test resource exhaustion scenario
     let resource_limit_response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/plm/resources?scenario=resource_exhaustion",
             plm_server.base_url
         ))
@@ -808,7 +807,7 @@ async fn test_plm_external_integrations() {
 
     // Test VLAB integration
     let vlab_targets_response = client
-        .get(&format!("{}/api/plm/vlab/targets", plm_server.base_url))
+        .get(format!("{}/api/plm/vlab/targets", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -820,7 +819,7 @@ async fn test_plm_external_integrations() {
 
     // Test SCM integration
     let scm_repos_response = client
-        .get(&format!("{}/api/plm/scm/repositories", plm_server.base_url))
+        .get(format!("{}/api/plm/scm/repositories", plm_server.base_url))
         .send()
         .await
         .unwrap();
@@ -832,7 +831,7 @@ async fn test_plm_external_integrations() {
 
     // Test Jenkins integration
     let jenkins_jobs_response = client
-        .get(&format!("{}/api/plm/jenkins/jobs", plm_server.base_url))
+        .get(format!("{}/api/plm/jenkins/jobs", plm_server.base_url))
         .send()
         .await
         .unwrap();

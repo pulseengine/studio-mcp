@@ -85,7 +85,7 @@ impl StudioAuthService {
         let client = Client::builder()
             .timeout(Duration::from_secs(timeout_seconds))
             .build()
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         Ok(Self {
             auth_manager,
@@ -185,7 +185,7 @@ impl StudioAuthService {
                         // If refresh fails, credentials are invalid
                         self.logout(&credentials.instance_id, &credentials.environment)
                             .await?;
-                        return Err(StudioError::Auth(format!("Token refresh failed: {}", e)));
+                        return Err(StudioError::Auth(format!("Token refresh failed: {e}")));
                     }
                 }
             }
@@ -224,7 +224,7 @@ impl StudioAuthService {
 
     /// Verify that a Studio instance is reachable
     pub async fn verify_studio_instance(&self, studio_url: &str) -> Result<()> {
-        let health_url = format!("{}/api/health", studio_url);
+        let health_url = format!("{studio_url}/api/health");
 
         let response = self
             .client
@@ -232,7 +232,7 @@ impl StudioAuthService {
             .timeout(Duration::from_secs(10))
             .send()
             .await
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         if response.status().is_success() {
             Ok(())
@@ -251,7 +251,7 @@ impl StudioAuthService {
         username: &str,
         password: &str,
     ) -> Result<AuthResponse> {
-        let auth_url = format!("{}/api/auth/token", studio_url);
+        let auth_url = format!("{studio_url}/api/auth/token");
 
         let request = AuthRequest {
             username: username.to_string(),
@@ -266,11 +266,11 @@ impl StudioAuthService {
             .json(&request)
             .send()
             .await
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         if response.status().is_success() {
             let auth_response: AuthResponse =
-                response.json().await.map_err(|e| StudioError::Network(e))?;
+                response.json().await.map_err(StudioError::Network)?;
 
             Ok(auth_response)
         } else {
@@ -281,9 +281,9 @@ impl StudioAuthService {
             let error_text = if let Ok(error_response) = response.json::<ApiErrorResponse>().await {
                 error_response
                     .error_description
-                    .unwrap_or_else(|| error_response.error)
+                    .unwrap_or(error_response.error)
             } else {
-                format!("Authentication failed with status: {}", status)
+                format!("Authentication failed with status: {status}")
             };
 
             Err(StudioError::Auth(error_text))
@@ -296,7 +296,7 @@ impl StudioAuthService {
         studio_url: &str,
         refresh_token: &str,
     ) -> Result<AuthToken> {
-        let refresh_url = format!("{}/api/auth/refresh", studio_url);
+        let refresh_url = format!("{studio_url}/api/auth/refresh");
 
         let mut refresh_request = std::collections::HashMap::new();
         refresh_request.insert("grant_type", "refresh_token");
@@ -308,11 +308,11 @@ impl StudioAuthService {
             .json(&refresh_request)
             .send()
             .await
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         if response.status().is_success() {
             let auth_response: AuthResponse =
-                response.json().await.map_err(|e| StudioError::Network(e))?;
+                response.json().await.map_err(StudioError::Network)?;
 
             Ok(self.create_auth_token(auth_response, studio_url)?)
         } else {
@@ -322,7 +322,7 @@ impl StudioAuthService {
 
     /// Revoke token on server
     async fn revoke_token(&self, studio_url: &str, access_token: &str) -> Result<()> {
-        let revoke_url = format!("{}/api/auth/revoke", studio_url);
+        let revoke_url = format!("{studio_url}/api/auth/revoke");
 
         let mut revoke_request = std::collections::HashMap::new();
         revoke_request.insert("token", access_token);
@@ -334,7 +334,7 @@ impl StudioAuthService {
             .json(&revoke_request)
             .send()
             .await
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         // Don't fail if revocation fails - just log it
         Ok(())
@@ -361,7 +361,7 @@ impl StudioAuthService {
         // For now, just decode without validation since we don't have the public key
         // In production, you'd validate with the proper key from Studio
         let _header = decode_header(token)
-            .map_err(|e| StudioError::Auth(format!("Invalid token header: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("Invalid token header: {e}")))?;
 
         // Use a dummy key for now - in production, fetch from Studio's JWKS endpoint
         let _key = DecodingKey::from_secret(b"dummy-key");
@@ -382,11 +382,11 @@ impl StudioAuthService {
         let mut normalized = url.trim_end_matches('/').to_string();
 
         if !normalized.starts_with("http://") && !normalized.starts_with("https://") {
-            normalized = format!("https://{}", normalized);
+            normalized = format!("https://{normalized}");
         }
 
         // Validate URL format
-        url::Url::parse(&normalized).map_err(|e| StudioError::UrlParse(e))?;
+        url::Url::parse(&normalized).map_err(StudioError::UrlParse)?;
 
         Ok(normalized)
     }
@@ -413,7 +413,7 @@ impl AuthManager {
 
         tokio::task::spawn_blocking(move || storage_clone.store_credentials(&creds))
             .await
-            .map_err(|e| StudioError::Unknown(format!("Task join error: {}", e)))??;
+            .map_err(|e| StudioError::Unknown(format!("Task join error: {e}")))??;
 
         // Update cache
         let cache_key = format!("{}:{}", credentials.environment, credentials.instance_id);

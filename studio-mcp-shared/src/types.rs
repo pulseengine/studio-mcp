@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 
 /// Studio CLI version information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,8 +177,10 @@ impl ResourceUri {
             query,
         })
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl fmt::Display for ResourceUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let path = self.path.join("/");
         let query = if self.query.is_empty() {
             String::new()
@@ -185,11 +188,11 @@ impl ResourceUri {
             let query_string: Vec<String> = self
                 .query
                 .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
+                .map(|(k, v)| format!("{k}={v}"))
                 .collect();
             format!("?{}", query_string.join("&"))
         };
 
-        format!("{}:/{}{}", self.scheme, path, query)
+        write!(f, "{}:/{}{}", self.scheme, path, query)
     }
 }

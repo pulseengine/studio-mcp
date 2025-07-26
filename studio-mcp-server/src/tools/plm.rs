@@ -9,6 +9,7 @@ use tracing::{debug, error};
 
 pub struct PlmToolProvider {
     cli_manager: Arc<CliManager>,
+    #[allow(dead_code)]
     config: StudioConfig,
 }
 
@@ -385,8 +386,7 @@ impl PlmToolProvider {
             _ => {
                 error!("Unknown PLM tool: {}", name);
                 Err(StudioError::InvalidOperation(format!(
-                    "PLM tool '{}' not found",
-                    name
+                    "PLM tool '{name}' not found"
                 )))
             }
         }
@@ -398,8 +398,8 @@ impl PlmToolProvider {
         // Add optional filters
         let mut name_filter = None;
         let mut user_filter = None;
-        let mut limit_str = String::new();
-        let mut offset_str = String::new();
+        let limit_str;
+        let offset_str;
 
         if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--name", name]);
@@ -628,10 +628,10 @@ impl PlmToolProvider {
         let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str())
         {
             cli_args.extend_from_slice(&["--pipeline", name]);
-            Some(format!("name: {}", name))
+            Some(format!("name: {name}"))
         } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--pipeline", id]);
-            Some(format!("id: {}", id))
+            Some(format!("id: {id}"))
         } else {
             None
         };
@@ -1068,9 +1068,9 @@ impl PlmToolProvider {
                         .map(|(idx, l)| {
                             let line_num = start + idx;
                             if line_num == i {
-                                format!(">>> {} ERROR: {}", line_num, l) // Mark error line
+                                format!(">>> {line_num} ERROR: {l}") // Mark error line
                             } else {
-                                format!("    {} {}", line_num, l)
+                                format!("    {line_num} {l}")
                             }
                         })
                         .collect();

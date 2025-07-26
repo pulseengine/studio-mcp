@@ -8,7 +8,6 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use uuid::Uuid;
 use wiremock::{
     matchers::{method, path, path_regex, query_param},
     Mock, MockServer, ResponseTemplate,
@@ -1808,8 +1807,8 @@ mod tests {
 
         // Test pipeline listing
         let response = client
-            .get(&format!("{}/api/plm/pipelines", mock_server.base_url))
-            .header("authorization", format!("Bearer {}", token))
+            .get(format!("{}/api/plm/pipelines", mock_server.base_url))
+            .header("authorization", format!("Bearer {token}"))
             .send()
             .await
             .unwrap();
@@ -1834,11 +1833,11 @@ mod tests {
 
         // Test pipeline start
         let response = client
-            .post(&format!(
+            .post(format!(
                 "{}/api/plm/pipelines/vxworks-kernel-001/start",
                 mock_server.base_url
             ))
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {token}"))
             .json(&json!({
                 "parameters": {
                     "TARGET_ARCH": "arm64",
@@ -1864,11 +1863,11 @@ mod tests {
 
         // Test system resources
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/api/plm/system/resources",
                 mock_server.base_url
             ))
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {token}"))
             .send()
             .await
             .unwrap();
@@ -1894,11 +1893,11 @@ mod tests {
 
         // Test VLAB integration
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/api/plm/integrations/vlab/targets",
                 mock_server.base_url
             ))
-            .header("authorization", format!("Bearer {}", token))
+            .header("authorization", format!("Bearer {token}"))
             .send()
             .await
             .unwrap();

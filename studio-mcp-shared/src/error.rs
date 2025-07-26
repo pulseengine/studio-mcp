@@ -55,7 +55,7 @@ impl From<BackendError> for StudioError {
         match err {
             BackendError::NotInitialized => StudioError::Mcp("Backend not initialized".to_string()),
             BackendError::Configuration(msg) => StudioError::Config(msg),
-            BackendError::Connection(msg) => StudioError::Mcp(format!("Connection error: {}", msg)),
+            BackendError::Connection(msg) => StudioError::Mcp(format!("Connection error: {msg}")),
             BackendError::NotSupported(msg) => StudioError::InvalidOperation(msg),
             BackendError::Internal(msg) => StudioError::Mcp(msg),
             BackendError::Custom(err) => StudioError::Unknown(err.to_string()),
@@ -66,27 +66,27 @@ impl From<BackendError> for StudioError {
 impl From<StudioError> for Error {
     fn from(err: StudioError) -> Self {
         match err {
-            StudioError::Cli(msg) => Error::internal_error(format!("CLI error: {}", msg)),
+            StudioError::Cli(msg) => Error::internal_error(format!("CLI error: {msg}")),
             StudioError::Auth(msg) => {
-                Error::invalid_params(format!("Authentication error: {}", msg))
+                Error::invalid_params(format!("Authentication error: {msg}"))
             }
-            StudioError::Network(err) => Error::internal_error(format!("Network error: {}", err)),
-            StudioError::Io(err) => Error::internal_error(format!("IO error: {}", err)),
-            StudioError::Json(err) => Error::invalid_params(format!("JSON error: {}", err)),
+            StudioError::Network(err) => Error::internal_error(format!("Network error: {err}")),
+            StudioError::Io(err) => Error::internal_error(format!("IO error: {err}")),
+            StudioError::Json(err) => Error::invalid_params(format!("JSON error: {err}")),
             StudioError::UrlParse(err) => {
-                Error::invalid_params(format!("URL parse error: {}", err))
+                Error::invalid_params(format!("URL parse error: {err}"))
             }
             StudioError::Mcp(msg) => Error::internal_error(msg),
             StudioError::Config(msg) => {
-                Error::invalid_params(format!("Configuration error: {}", msg))
+                Error::invalid_params(format!("Configuration error: {msg}"))
             }
             StudioError::ResourceNotFound(msg) => {
-                Error::invalid_request(format!("Resource not found: {}", msg))
+                Error::invalid_request(format!("Resource not found: {msg}"))
             }
             StudioError::InvalidOperation(msg) => Error::method_not_found(msg),
-            StudioError::Timeout(msg) => Error::internal_error(format!("Timeout: {}", msg)),
+            StudioError::Timeout(msg) => Error::internal_error(format!("Timeout: {msg}")),
             StudioError::ChecksumMismatch => Error::internal_error("Checksum verification failed"),
-            StudioError::Unknown(msg) => Error::internal_error(format!("Unknown error: {}", msg)),
+            StudioError::Unknown(msg) => Error::internal_error(format!("Unknown error: {msg}")),
         }
     }
 }

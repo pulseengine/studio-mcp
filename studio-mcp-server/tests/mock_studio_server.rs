@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use wiremock::{
-    matchers::{body_json, header, method, path, path_regex, query_param},
+    matchers::{header, method, path, path_regex},
     Mock, MockServer, ResponseTemplate,
 };
 
@@ -636,7 +636,7 @@ mod tests {
 
         // Test OIDC discovery
         let response = client
-            .get(&format!(
+            .get(format!(
                 "{}/.well-known/openid_configuration",
                 mock_server.base_url
             ))
@@ -650,7 +650,7 @@ mod tests {
 
         // Test token exchange
         let token_response = client
-            .post(&format!(
+            .post(format!(
                 "{}/auth/realms/studio/protocol/openid-connect/token",
                 mock_server.base_url
             ))
@@ -677,8 +677,8 @@ mod tests {
 
         // Test MCP resources list
         let response = client
-            .get(&format!("{}/api/v1/resources", mock_server.base_url))
-            .header("authorization", format!("Bearer {}", token))
+            .get(format!("{}/api/v1/resources", mock_server.base_url))
+            .header("authorization", format!("Bearer {token}"))
             .send()
             .await
             .unwrap();
@@ -697,8 +697,8 @@ mod tests {
 
         // Test VLAB targets list
         let response = client
-            .get(&format!("{}/api/vlab/targets", mock_server.base_url))
-            .header("authorization", format!("Bearer {}", token))
+            .get(format!("{}/api/vlab/targets", mock_server.base_url))
+            .header("authorization", format!("Bearer {token}"))
             .send()
             .await
             .unwrap();
@@ -710,8 +710,8 @@ mod tests {
 
         // Test VLAB reservation creation
         let reservation_response = client
-            .post(&format!("{}/api/vlab/reservations", mock_server.base_url))
-            .header("authorization", format!("Bearer {}", token))
+            .post(format!("{}/api/vlab/reservations", mock_server.base_url))
+            .header("authorization", format!("Bearer {token}"))
             .json(&json!({
                 "target_id": "target-001",
                 "duration": 8

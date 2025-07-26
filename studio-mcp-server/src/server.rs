@@ -19,6 +19,7 @@ use crate::resources::ResourceProvider;
 use crate::tools::ToolProvider;
 
 pub struct StudioMcpServer {
+    #[allow(dead_code)]
     config: StudioConfig,
     cli_manager: Arc<CliManager>,
     resource_provider: Arc<ResourceProvider>,
@@ -75,14 +76,14 @@ impl StudioMcpServer {
         };
         let mut server = McpServer::new(backend, server_config)
             .await
-            .map_err(|e| StudioError::Mcp(format!("Failed to create server: {}", e)))?;
+            .map_err(|e| StudioError::Mcp(format!("Failed to create server: {e}")))?;
 
         info!("Starting PulseEngine MCP server with stdio transport");
 
         server
             .run()
             .await
-            .map_err(|e| StudioError::Mcp(format!("Server run error: {}", e)))
+            .map_err(|e| StudioError::Mcp(format!("Server run error: {e}")))
     }
 }
 
@@ -219,7 +220,7 @@ impl McpBackend for StudioMcpBackend {
         // Basic health check - verify CLI is available
         match self.inner.cli_manager.ensure_cli(None).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(StudioError::Cli(format!("Health check failed: {}", e))),
+            Err(e) => Err(StudioError::Cli(format!("Health check failed: {e}"))),
         }
     }
 

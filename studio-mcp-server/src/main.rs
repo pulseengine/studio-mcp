@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             error!("Failed to load configuration: {}", e);
-            eprintln!("Error loading configuration: {}", e);
+            eprintln!("Error loading configuration: {e}");
             eprintln!(
                 "Run `{} --init` to create a default configuration.",
                 args[0]
@@ -106,7 +106,7 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
 
     // Check if config already exists
     if std::path::Path::new(config_path).exists() {
-        eprintln!("Configuration file '{}' already exists.", config_path);
+        eprintln!("Configuration file '{config_path}' already exists.");
         eprintln!("Remove it first if you want to create a new one.");
         std::process::exit(1);
     }
@@ -135,8 +135,7 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
     match config.save(config_path) {
         Ok(_) => {
             println!(
-                "✅ Configuration file '{}' created successfully!",
-                config_path
+                "✅ Configuration file '{config_path}' created successfully!"
             );
             println!();
             println!("Default configuration includes:");
@@ -155,7 +154,7 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
             Ok(())
         }
         Err(e) => {
-            eprintln!("Failed to create configuration file: {}", e);
+            eprintln!("Failed to create configuration file: {e}");
             std::process::exit(1);
         }
     }

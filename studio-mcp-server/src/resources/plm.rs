@@ -9,6 +9,7 @@ use tracing::{debug, warn};
 
 pub struct PlmResourceProvider {
     cli_manager: Arc<CliManager>,
+    #[allow(dead_code)]
     config: StudioConfig,
 }
 
@@ -103,11 +104,10 @@ impl PlmResourceProvider {
 
                         // Pipeline definition resource
                         resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}", pipeline_id),
-                            name: format!("Pipeline: {}", pipeline_name),
+                            uri: format!("studio://plm/pipelines/{pipeline_id}"),
+                            name: format!("Pipeline: {pipeline_name}"),
                             description: Some(format!(
-                                "Pipeline definition (YAML/JSON) for {}",
-                                pipeline_name
+                                "Pipeline definition (YAML/JSON) for {pipeline_name}"
                             )),
                             mime_type: Some("application/yaml".to_string()),
                             annotations: None,
@@ -116,11 +116,10 @@ impl PlmResourceProvider {
 
                         // Pipeline runs resource
                         resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}/runs", pipeline_id),
-                            name: format!("Runs: {}", pipeline_name),
+                            uri: format!("studio://plm/pipelines/{pipeline_id}/runs"),
+                            name: format!("Runs: {pipeline_name}"),
                             description: Some(format!(
-                                "Execution runs for pipeline {}",
-                                pipeline_name
+                                "Execution runs for pipeline {pipeline_name}"
                             )),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
@@ -129,11 +128,10 @@ impl PlmResourceProvider {
 
                         // Pipeline events resource
                         resources.push(Resource {
-                            uri: format!("studio://plm/pipelines/{}/events", pipeline_id),
-                            name: format!("Events: {}", pipeline_name),
+                            uri: format!("studio://plm/pipelines/{pipeline_id}/events"),
+                            name: format!("Events: {pipeline_name}"),
                             description: Some(format!(
-                                "Recent events for pipeline {}",
-                                pipeline_name
+                                "Recent events for pipeline {pipeline_name}"
                             )),
                             mime_type: Some("application/json".to_string()),
                             annotations: None,
@@ -172,8 +170,7 @@ impl PlmResourceProvider {
                 self.read_plm_root().await
             }
             Some(resource_type) => Err(StudioError::ResourceNotFound(format!(
-                "PLM resource type '{}' not found",
-                resource_type
+                "PLM resource type '{resource_type}' not found"
             ))),
         }
     }

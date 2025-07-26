@@ -57,8 +57,7 @@ impl ToolProvider {
             _ => {
                 error!("Unknown tool: {}", name);
                 Err(StudioError::InvalidOperation(format!(
-                    "Tool '{}' not found",
-                    name
+                    "Tool '{name}' not found"
                 )))
             }
         }

@@ -136,7 +136,7 @@ impl TokenValidator {
         let header = match decode_header(&token.access_token) {
             Ok(h) => h,
             Err(e) => {
-                result.errors.push(format!("Invalid JWT header: {}", e));
+                result.errors.push(format!("Invalid JWT header: {e}"));
                 return Ok(result);
             }
         };
@@ -147,7 +147,7 @@ impl TokenValidator {
             Err(e) => {
                 result
                     .errors
-                    .push(format!("Failed to get decoding key: {}", e));
+                    .push(format!("Failed to get decoding key: {e}"));
                 return Ok(result);
             }
         };
@@ -162,7 +162,7 @@ impl TokenValidator {
                 result.claims = Some(token_data.claims);
             }
             Err(e) => {
-                result.errors.push(format!("JWT validation failed: {}", e));
+                result.errors.push(format!("JWT validation failed: {e}"));
             }
         }
 
@@ -230,7 +230,7 @@ impl TokenValidator {
         claims
             .instance_id
             .as_ref()
-            .map_or(false, |id| id == expected_instance)
+            .is_some_and(|id| id == expected_instance)
     }
 
     /// Get or fetch JWKS decoding key
@@ -265,7 +265,7 @@ impl TokenValidator {
 
     /// Fetch JWKS from Studio instance
     async fn fetch_jwks(&self, studio_url: &str) -> Result<JwksResponse> {
-        let jwks_url = format!("{}/.well-known/jwks.json", studio_url);
+        let jwks_url = format!("{studio_url}/.well-known/jwks.json");
 
         let response = self
             .client
@@ -273,7 +273,7 @@ impl TokenValidator {
             .timeout(std::time::Duration::from_secs(10))
             .send()
             .await
-            .map_err(|e| StudioError::Network(e))?;
+            .map_err(StudioError::Network)?;
 
         if !response.status().is_success() {
             return Err(StudioError::Auth(format!(
@@ -282,7 +282,7 @@ impl TokenValidator {
             )));
         }
 
-        let jwks: JwksResponse = response.json().await.map_err(|e| StudioError::Network(e))?;
+        let jwks: JwksResponse = response.json().await.map_err(StudioError::Network)?;
 
         Ok(jwks)
     }
@@ -360,7 +360,7 @@ impl TokenValidator {
         validation.insecure_disable_signature_validation();
 
         let token_data = decode::<StudioTokenClaims>(token, key, &validation)
-            .map_err(|e| StudioError::Auth(format!("JWT decode failed: {}", e)))?;
+            .map_err(|e| StudioError::Auth(format!("JWT decode failed: {e}")))?;
 
         Ok(token_data)
     }

@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 /// Main configuration for the Studio MCP server
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct StudioConfig {
     /// Studio connections
     pub connections: HashMap<String, StudioConnection>,
@@ -93,17 +94,6 @@ pub struct LoggingConfig {
     pub log_file: Option<String>,
 }
 
-impl Default for StudioConfig {
-    fn default() -> Self {
-        Self {
-            connections: HashMap::new(),
-            default_connection: None,
-            cli: CliConfig::default(),
-            cache: CacheConfig::default(),
-            logging: LoggingConfig::default(),
-        }
-    }
-}
 
 impl Default for CliConfig {
     fn default() -> Self {

@@ -60,7 +60,7 @@ impl AuthenticatedCliManager {
         instance_id: &str,
         environment: &str,
     ) -> Result<AuthCredentials> {
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
 
         // Check cache first
         {
@@ -133,7 +133,7 @@ impl AuthenticatedCliManager {
     /// Logout from a Studio instance
     pub async fn logout(&self, instance_id: &str, environment: &str) -> Result<()> {
         // Remove from cache
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
         {
             let mut cache = self.credentials_cache.write().await;
             cache.remove(&cache_key);
@@ -187,7 +187,7 @@ impl AuthenticatedCliManager {
         let refreshed = auth_service.refresh_credentials(credentials).await?;
 
         // Update cache
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
         let mut cache = self.credentials_cache.write().await;
         cache.insert(cache_key, refreshed.clone());
 

@@ -76,7 +76,7 @@ impl AuthMiddleware {
         instance_id: &str,
         environment: &str,
     ) -> Result<AuthContext> {
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
 
         // Check cache first
         {
@@ -172,7 +172,7 @@ impl AuthMiddleware {
 
     /// Force refresh authentication for instance
     pub async fn refresh_auth(&self, instance_id: &str, environment: &str) -> Result<AuthContext> {
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
 
         // Remove from cache to force refresh
         {
@@ -208,7 +208,7 @@ impl AuthMiddleware {
 
     /// Logout from instance
     pub async fn logout(&self, instance_id: &str, environment: &str) -> Result<()> {
-        let cache_key = format!("{}:{}", environment, instance_id);
+        let cache_key = format!("{environment}:{instance_id}");
 
         // Remove from cache
         {
@@ -266,7 +266,7 @@ impl AuthMiddleware {
             total_contexts,
             valid_contexts,
             expired_contexts,
-            instances: cache.keys().map(|key| key.clone()).collect(),
+            instances: cache.keys().cloned().collect(),
         }
     }
 }
@@ -322,6 +322,7 @@ impl AuthContext {
 }
 
 /// Common scopes for Studio operations
+#[allow(dead_code)]
 pub mod scopes {
     pub const READ: &str = "read";
     pub const WRITE: &str = "write";
@@ -336,6 +337,7 @@ pub mod scopes {
 }
 
 /// Common roles for Studio users
+#[allow(dead_code)]
 pub mod roles {
     pub const USER: &str = "user";
     pub const ADMIN: &str = "admin";
