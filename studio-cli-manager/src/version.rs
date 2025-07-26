@@ -49,9 +49,7 @@ impl VersionManager {
         let (platform_dir, file_extension) = self.get_platform_info(platform);
 
         let base_url = "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd";
-        let url = format!(
-            "{base_url}/{version}/{platform_dir}/studio-cli{file_extension}"
-        );
+        let url = format!("{base_url}/{version}/{platform_dir}/studio-cli{file_extension}");
 
         Ok(CliVersion {
             version: version.to_string(),
@@ -113,9 +111,7 @@ impl VersionManager {
         versions
             .into_iter()
             .map(|version| {
-                let url = format!(
-                    "{base_url}/{version}/{platform_dir}/studio-cli{file_extension}"
-                );
+                let url = format!("{base_url}/{version}/{platform_dir}/studio-cli{file_extension}");
 
                 CliVersion {
                     version: version.to_string(),

@@ -134,9 +134,7 @@ async fn init_config(args: &[String]) -> anyhow::Result<()> {
     // Save configuration
     match config.save(config_path) {
         Ok(_) => {
-            println!(
-                "✅ Configuration file '{config_path}' created successfully!"
-            );
+            println!("✅ Configuration file '{config_path}' created successfully!");
             println!();
             println!("Default configuration includes:");
             println!("  • WindRiver Studio connection (requires authentication)");

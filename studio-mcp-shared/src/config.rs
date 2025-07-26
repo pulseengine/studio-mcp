@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Main configuration for the Studio MCP server
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StudioConfig {
     /// Studio connections
     pub connections: HashMap<String, StudioConnection>,
@@ -93,7 +92,6 @@ pub struct LoggingConfig {
     /// Log file path
     pub log_file: Option<String>,
 }
-
 
 impl Default for CliConfig {
     fn default() -> Self {

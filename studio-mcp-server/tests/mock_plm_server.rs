@@ -1863,10 +1863,7 @@ mod tests {
 
         // Test system resources
         let response = client
-            .get(format!(
-                "{}/api/plm/system/resources",
-                mock_server.base_url
-            ))
+            .get(format!("{}/api/plm/system/resources", mock_server.base_url))
             .header("authorization", format!("Bearer {token}"))
             .send()
             .await

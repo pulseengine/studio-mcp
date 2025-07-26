@@ -185,11 +185,8 @@ impl fmt::Display for ResourceUri {
         let query = if self.query.is_empty() {
             String::new()
         } else {
-            let query_string: Vec<String> = self
-                .query
-                .iter()
-                .map(|(k, v)| format!("{k}={v}"))
-                .collect();
+            let query_string: Vec<String> =
+                self.query.iter().map(|(k, v)| format!("{k}={v}")).collect();
             format!("?{}", query_string.join("&"))
         };
 

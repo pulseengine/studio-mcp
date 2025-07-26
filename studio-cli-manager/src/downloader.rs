@@ -39,7 +39,9 @@ impl CliDownloader {
         let response = self.client.get(&cli_version.url).send().await?;
 
         if !response.status().is_success() {
-            return Err(StudioError::Network(response.error_for_status().unwrap_err()));
+            return Err(StudioError::Network(
+                response.error_for_status().unwrap_err(),
+            ));
         }
 
         let bytes = response.bytes().await?;
