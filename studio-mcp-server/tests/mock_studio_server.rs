@@ -19,12 +19,14 @@ pub struct MockStudioServer {
     pub server: MockServer,
     pub base_url: String,
     /// JWT tokens for authentication simulation
+    #[allow(dead_code)]
     pub tokens: RwLock<HashMap<String, JwtToken>>,
     /// Resource state for different providers
     pub resources: RwLock<StudioResources>,
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct JwtToken {
     pub access_token: String,
     pub refresh_token: String,
@@ -41,6 +43,7 @@ pub struct StudioResources {
     pub scheduled_jobs: Vec<ScheduledJob>,
     pub users: Vec<User>,
     pub groups: Vec<Group>,
+    #[allow(dead_code)]
     pub licenses: Vec<License>,
 }
 

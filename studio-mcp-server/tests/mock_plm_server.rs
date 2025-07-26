@@ -1707,6 +1707,7 @@ impl MockPlmServer {
     }
 
     /// Generate realistic error scenarios
+    #[allow(dead_code)]
     pub async fn setup_error_scenarios(&self) {
         // Compilation error scenario
         Mock::given(method("GET"))
@@ -1875,7 +1876,9 @@ mod tests {
         assert!(resources["data"]["cpu"]["total_cores"].as_u64().unwrap() > 0);
         assert!(resources["data"]["memory"]["total_gb"].as_u64().unwrap() > 0);
         // active_builds is u64, so it's always >= 0 - just verify it exists
-        assert!(resources["data"]["builds"]["active_builds"].as_u64().is_some());
+        assert!(resources["data"]["builds"]["active_builds"]
+            .as_u64()
+            .is_some());
     }
 
     #[tokio::test]
