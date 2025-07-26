@@ -9,6 +9,7 @@ use tracing::{error, info};
 use tracing_subscriber::{fmt, EnvFilter};
 
 mod auth_middleware;
+mod cache;
 mod resources;
 mod server;
 mod tools;

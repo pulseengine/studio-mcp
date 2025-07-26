@@ -1,5 +1,6 @@
 //! PLM (Pipeline Management) resource provider
 
+use crate::cache::PlmCache;
 use pulseengine_mcp_protocol::{Content, Resource};
 use serde_json::Value;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ pub struct PlmResourceProvider {
     cli_manager: Arc<CliManager>,
     #[allow(dead_code)]
     config: StudioConfig,
+    cache: Arc<PlmCache>,
 }
 
 impl PlmResourceProvider {
@@ -18,7 +20,36 @@ impl PlmResourceProvider {
         Self {
             cli_manager,
             config,
+            cache: Arc::new(PlmCache::new()),
         }
+    }
+
+    pub fn with_cache(cli_manager: Arc<CliManager>, config: StudioConfig, cache: Arc<PlmCache>) -> Self {
+        Self {
+            cli_manager,
+            config,
+            cache,
+        }
+    }
+
+    /// Get access to the PLM cache for external invalidation and monitoring
+    pub fn cache(&self) -> Arc<PlmCache> {
+        self.cache.clone()
+    }
+
+    /// Invalidate cache when pipeline state changes (e.g., after run starts/completes)
+    pub async fn invalidate_pipeline_cache(&self, pipeline_id: &str) {
+        self.cache.invalidate_pipeline(pipeline_id).await;
+    }
+
+    /// Invalidate cache when run state changes
+    pub async fn invalidate_run_cache(&self, run_id: &str) {
+        self.cache.invalidate_run(run_id).await;
+    }
+
+    /// Clean up expired cache entries
+    pub async fn cleanup_cache(&self) -> usize {
+        self.cache.cleanup_expired().await
     }
 
     pub async fn list_resources(&self) -> Result<Vec<Resource>> {
@@ -389,23 +420,45 @@ impl PlmResourceProvider {
 
     // CLI interaction methods
     async fn get_pipeline_list(&self) -> Result<Vec<Value>> {
+        let cache_key = PlmCache::pipeline_list_key();
+        
+        // Try cache first
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            if let Some(pipelines) = cached_value.get("pipelines").and_then(|v| v.as_array()) {
+                debug!("Returning cached pipeline list ({} pipelines)", pipelines.len());
+                return Ok(pipelines.clone());
+            }
+        }
+
+        // Cache miss - fetch from CLI
         match self
             .cli_manager
             .execute(&["plm", "pipeline", "list", "--output", "json"], None)
             .await
         {
             Ok(result) => {
-                if let Some(pipelines) = result.as_array() {
-                    Ok(pipelines.clone())
+                let pipelines = if let Some(pipelines) = result.as_array() {
+                    pipelines.clone()
                 } else if let Some(obj) = result.as_object() {
                     if let Some(pipelines) = obj.get("pipelines").and_then(|v| v.as_array()) {
-                        Ok(pipelines.clone())
+                        pipelines.clone()
                     } else {
-                        Ok(vec![result])
+                        vec![result]
                     }
                 } else {
-                    Ok(vec![])
-                }
+                    vec![]
+                };
+
+                // Cache the result
+                let cache_data = serde_json::json!({
+                    "pipelines": pipelines,
+                    "total": pipelines.len(),
+                    "cached_at": chrono::Utc::now().to_rfc3339()
+                });
+                self.cache.insert(cache_key, cache_data).await;
+
+                debug!("Fetched and cached {} pipelines", pipelines.len());
+                Ok(pipelines)
             }
             Err(e) => {
                 warn!("Failed to list pipelines: {}", e);
@@ -415,16 +468,43 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_definition(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::pipeline_definition_key(pipeline_id);
+        
+        // Try cache first (pipeline definitions are immutable)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached pipeline definition for: {}", pipeline_id);
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(
                 &["plm", "pipeline", "get", pipeline_id, "--output", "yaml"],
                 None,
             )
             .await
+        {
+            Ok(result) => {
+                // Cache the result (immutable data)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached pipeline definition for: {}", pipeline_id);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_pipeline_runs(&self, pipeline_id: &str) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::pipeline_runs_key(pipeline_id);
+        
+        // Try cache first (semi-dynamic data)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached pipeline runs for: {}", pipeline_id);
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(
                 &[
                     "plm",
@@ -438,11 +518,28 @@ impl PlmResourceProvider {
                 None,
             )
             .await
+        {
+            Ok(result) => {
+                // Cache the result (semi-dynamic data)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached pipeline runs for: {}", pipeline_id);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_pipeline_events(&self, pipeline_id: &str) -> Result<Value> {
-        // Get recent run events for a pipeline
-        self.cli_manager
+        let cache_key = PlmCache::pipeline_events_key(pipeline_id);
+        
+        // Try cache first (dynamic data - short TTL)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached pipeline events for: {}", pipeline_id);
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(
                 &[
                     "plm",
@@ -456,42 +553,140 @@ impl PlmResourceProvider {
                 None,
             )
             .await
+        {
+            Ok(result) => {
+                // Cache the result (dynamic data)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached pipeline events for: {}", pipeline_id);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_run_details(&self, _pipeline_id: &str, run_id: &str) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::run_details_key(run_id);
+        
+        // Try cache first - check if run is completed for better caching
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached run details for: {}", run_id);
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(&["plm", "run", "get", run_id, "--output", "json"], None)
             .await
+        {
+            Ok(result) => {
+                // Cache the result - let cache type detection handle TTL based on run status
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached run details for: {}", run_id);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_all_runs(&self) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::all_runs_key();
+        
+        // Try cache first (semi-dynamic data)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached all runs list");
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(&["plm", "run", "list", "--output", "json"], None)
             .await
+        {
+            Ok(result) => {
+                // Cache the result (semi-dynamic data)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached all runs list");
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_run_by_id(&self, run_id: &str) -> Result<Value> {
-        self.cli_manager
-            .execute(&["plm", "run", "get", run_id, "--output", "json"], None)
-            .await
+        // Reuse the run details caching logic
+        self.get_run_details("", run_id).await
     }
 
     async fn get_all_tasks(&self) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::tasks_key();
+        
+        // Try cache first (immutable/semi-static data)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached tasks list");
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(&["plm", "task", "list", "--output", "json"], None)
             .await
+        {
+            Ok(result) => {
+                // Cache the result (task libraries are relatively static)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached tasks list");
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_task_details(&self, task_id: &str) -> Result<Value> {
-        self.cli_manager
+        let cache_key = format!("task:details:{}", task_id);
+        
+        // Try cache first (task details are immutable)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached task details for: {}", task_id);
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(&["plm", "task", "get", task_id, "--output", "json"], None)
             .await
+        {
+            Ok(result) => {
+                // Cache the result (task definitions are immutable)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached task details for: {}", task_id);
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_pipeline_resources(&self) -> Result<Value> {
-        self.cli_manager
+        let cache_key = PlmCache::pipeline_resources_key();
+        
+        // Try cache first (semi-dynamic data)
+        if let Some(cached_value) = self.cache.get(&cache_key).await {
+            debug!("Returning cached pipeline resources");
+            return Ok(cached_value);
+        }
+
+        // Cache miss - fetch from CLI
+        match self.cli_manager
             .execute(&["plm", "resource", "list", "--output", "json"], None)
             .await
+        {
+            Ok(result) => {
+                // Cache the result (resource assignments change semi-frequently)
+                self.cache.insert(cache_key, result.clone()).await;
+                debug!("Fetched and cached pipeline resources");
+                Ok(result)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     async fn get_pipeline_groups(&self) -> Result<Value> {
