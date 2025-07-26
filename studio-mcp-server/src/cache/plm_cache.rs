@@ -6,7 +6,7 @@
 //! - Cache warming for frequently accessed resources
 //! - Integration with CLI command patterns
 
-use super::{CacheConfig, CacheStats, CacheStore, CacheType, CachedItem};
+use super::{CacheConfig, CacheContext, CacheStats, CacheStore, CacheType, CachedItem};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -53,40 +53,42 @@ impl PlmCache {
         }
     }
 
-    /// Get a cached value by key, updating access statistics
-    pub async fn get(&self, key: &str) -> Option<Value> {
+    /// Get a cached value by key with user context, updating access statistics
+    pub async fn get(&self, context: &CacheContext, key: &str) -> Option<Value> {
         if !self.config.enabled {
             return None;
         }
 
+        let full_key = self.build_cache_key(context, key);
         let cache_type = Self::detect_cache_type(key);
         let store = self.stores.get(&cache_type)?;
         let mut store_guard = store.write().await;
 
-        match store_guard.get(key) {
+        match store_guard.get(&full_key) {
             Some(value) => {
                 if self.config.enable_stats {
                     self.stats.write().await.record_hit();
                 }
-                trace!("Cache hit for PLM key: {}", key);
+                trace!("Cache hit for PLM key: {}", full_key);
                 Some(value.clone())
             }
             None => {
                 if self.config.enable_stats {
                     self.stats.write().await.record_miss();
                 }
-                trace!("Cache miss for PLM key: {}", key);
+                trace!("Cache miss for PLM key: {}", full_key);
                 None
             }
         }
     }
 
-    /// Insert a value into the cache with automatic type detection
-    pub async fn insert(&self, key: String, value: Value) {
+    /// Insert a value into the cache with automatic type detection and user context
+    pub async fn insert(&self, context: &CacheContext, key: String, value: Value) {
         if !self.config.enabled {
             return;
         }
 
+        let full_key = self.build_cache_key(context, &key);
         let cache_type = Self::detect_cache_type(&key);
         let store = match self.stores.get(&cache_type) {
             Some(store) => store,
@@ -103,40 +105,48 @@ impl PlmCache {
         }
 
         let mut store_guard = store.write().await;
-        store_guard.insert(key.clone(), item);
+        store_guard.insert(full_key.clone(), item);
 
         if self.config.enable_stats {
             self.stats.write().await.record_insertion(cache_type);
         }
 
-        debug!("Cached PLM resource: {} (type: {:?})", key, cache_type);
+        debug!("Cached PLM resource: {} (type: {:?})", full_key, cache_type);
+    }
+
+    /// Build a cache key with user context
+    fn build_cache_key(&self, context: &CacheContext, key: &str) -> String {
+        format!("{}:{}", context.cache_prefix(), key)
     }
 
     /// Remove a specific key from the cache
-    pub async fn remove(&self, key: &str) {
+    pub async fn remove(&self, context: &CacheContext, key: &str) {
         if !self.config.enabled {
             return;
         }
 
+        let full_key = self.build_cache_key(context, key);
         let cache_type = Self::detect_cache_type(key);
         if let Some(store) = self.stores.get(&cache_type) {
             let mut store_guard = store.write().await;
-            if store_guard.remove(key).is_some() {
+            if store_guard.remove(&full_key).is_some() {
                 if self.config.enable_stats {
                     self.stats.write().await.record_eviction(cache_type);
                 }
-                debug!("Removed from PLM cache: {}", key);
+                debug!("Removed from PLM cache: {}", full_key);
             }
         }
     }
 
-    /// Invalidate cache entries based on PLM resource changes
-    pub async fn invalidate_pattern(&self, pattern: &str) {
+    /// Invalidate cache entries based on PLM resource changes for a specific user context
+    pub async fn invalidate_pattern(&self, context: &CacheContext, pattern: &str) {
         if !self.config.enabled {
             return;
         }
 
-        debug!("Invalidating PLM cache pattern: {}", pattern);
+        let context_prefix = context.cache_prefix();
+        let full_pattern = format!("{}:{}", context_prefix, pattern);
+        debug!("Invalidating PLM cache pattern: {}", full_pattern);
         let mut invalidated_count = 0;
 
         for store in self.stores.values() {
@@ -144,7 +154,7 @@ impl PlmCache {
             let keys_to_remove: Vec<String> = store_guard
                 .items
                 .keys()
-                .filter(|key| key.contains(pattern))
+                .filter(|key| key.contains(&full_pattern))
                 .cloned()
                 .collect();
 
@@ -160,34 +170,34 @@ impl PlmCache {
             }
         }
 
-        debug!("Invalidated {} PLM cache entries", invalidated_count);
+        debug!("Invalidated {} PLM cache entries for pattern: {}", invalidated_count, full_pattern);
     }
 
-    /// Invalidate caches when pipeline state changes
-    pub async fn invalidate_pipeline(&self, pipeline_id: &str) {
+    /// Invalidate caches when pipeline state changes for a specific user
+    pub async fn invalidate_pipeline(&self, context: &CacheContext, pipeline_id: &str) {
         // Invalidate pipeline-specific caches with more specific patterns
-        self.invalidate_pattern(&format!("pipeline:def:{}", pipeline_id))
+        self.invalidate_pattern(context, &format!("pipeline:def:{}", pipeline_id))
             .await;
-        self.invalidate_pattern(&format!("pipeline:runs:{}", pipeline_id))
+        self.invalidate_pattern(context, &format!("pipeline:runs:{}", pipeline_id))
             .await;
-        self.invalidate_pattern(&format!("pipeline:events:{}", pipeline_id))
+        self.invalidate_pattern(context, &format!("pipeline:events:{}", pipeline_id))
             .await;
-        self.invalidate_pattern(&format!("pipelines/{}", pipeline_id))
+        self.invalidate_pattern(context, &format!("pipelines/{}", pipeline_id))
             .await;
 
         // Invalidate dynamic pipeline lists
-        self.remove("pipelines:list").await;
-        self.remove("runs:list").await;
+        self.remove(context, "pipelines:list").await;
+        self.remove(context, "runs:list").await;
     }
 
-    /// Invalidate caches when run state changes
-    pub async fn invalidate_run(&self, run_id: &str) {
+    /// Invalidate caches when run state changes for a specific user
+    pub async fn invalidate_run(&self, context: &CacheContext, run_id: &str) {
         // Invalidate run-specific caches
-        self.invalidate_pattern(&format!("run:{}", run_id)).await;
-        self.invalidate_pattern(&format!("runs/{}", run_id)).await;
+        self.invalidate_pattern(context, &format!("run:{}", run_id)).await;
+        self.invalidate_pattern(context, &format!("runs/{}", run_id)).await;
 
         // Invalidate dynamic run lists
-        self.remove("runs:list").await;
+        self.remove(context, "runs:list").await;
     }
 
     /// Clean up expired entries across all cache stores
@@ -272,13 +282,13 @@ impl PlmCache {
         CacheType::Dynamic
     }
 
-    /// Pre-warm cache with commonly accessed PLM resources
-    pub async fn warm_cache(&self, pipeline_ids: &[String]) {
+    /// Pre-warm cache with commonly accessed PLM resources for a specific user
+    pub async fn warm_cache(&self, context: &CacheContext, pipeline_ids: &[String]) {
         if !self.config.enabled {
             return;
         }
 
-        debug!("Warming PLM cache for {} pipelines", pipeline_ids.len());
+        debug!("Warming PLM cache for {} pipelines (user: {})", pipeline_ids.len(), context.user_id);
 
         // Cache pipeline definitions (immutable)
         for pipeline_id in pipeline_ids {
@@ -289,7 +299,7 @@ impl PlmCache {
                 "name": format!("Pipeline {}", pipeline_id),
                 "status": "active"
             });
-            self.insert(key, mock_definition).await;
+            self.insert(context, key, mock_definition).await;
         }
 
         // Cache pipeline list (semi-dynamic)
@@ -297,9 +307,9 @@ impl PlmCache {
             "pipelines": pipeline_ids,
             "total": pipeline_ids.len()
         });
-        self.insert("pipelines:list".to_string(), pipeline_list).await;
+        self.insert(context, "pipelines:list".to_string(), pipeline_list).await;
 
-        debug!("PLM cache warmed with {} pipeline definitions", pipeline_ids.len());
+        debug!("PLM cache warmed with {} pipeline definitions for user: {}", pipeline_ids.len(), context.user_id);
     }
 }
 
@@ -402,48 +412,52 @@ mod tests {
     #[tokio::test]
     async fn test_plm_cache_operations() {
         let cache = PlmCache::new();
+        let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
         let test_data = json!({"test": "data"});
 
         // Test insertion and retrieval
         cache
-            .insert("pipeline:def:test".to_string(), test_data.clone())
+            .insert(&context, "pipeline:def:test".to_string(), test_data.clone())
             .await;
-        let cached = cache.get("pipeline:def:test").await;
+        let cached = cache.get(&context, "pipeline:def:test").await;
         assert_eq!(cached, Some(test_data));
 
         // Test cache miss
-        let missing = cache.get("nonexistent:key").await;
+        let missing = cache.get(&context, "nonexistent:key").await;
         assert_eq!(missing, None);
     }
 
     #[tokio::test]
     async fn test_plm_cache_invalidation() {
         let cache = PlmCache::new();
+        let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
 
         // Insert test data
         cache
             .insert(
+                &context,
                 "pipeline:def:123".to_string(),
                 json!({"id": "123", "name": "test"}),
             )
             .await;
         cache
             .insert(
+                &context,
                 "pipeline:runs:123".to_string(),
                 json!({"runs": []}),
             )
             .await;
 
         // Verify data exists
-        assert!(cache.get("pipeline:def:123").await.is_some());
-        assert!(cache.get("pipeline:runs:123").await.is_some());
+        assert!(cache.get(&context, "pipeline:def:123").await.is_some());
+        assert!(cache.get(&context, "pipeline:runs:123").await.is_some());
 
         // Invalidate pipeline
-        cache.invalidate_pipeline("123").await;
+        cache.invalidate_pipeline(&context, "123").await;
 
         // Verify data was invalidated
-        assert!(cache.get("pipeline:def:123").await.is_none());
-        assert!(cache.get("pipeline:runs:123").await.is_none());
+        assert!(cache.get(&context, "pipeline:def:123").await.is_none());
+        assert!(cache.get(&context, "pipeline:runs:123").await.is_none());
     }
 
     #[tokio::test]
@@ -452,51 +466,83 @@ mod tests {
         config.custom_ttl.insert(CacheType::Dynamic, Duration::from_millis(50));
         
         let cache = PlmCache::with_config(config);
+        let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
         
         // Insert dynamic data with short TTL
         cache
-            .insert("run:events:123".to_string(), json!({"events": []}))
+            .insert(&context, "run:events:123".to_string(), json!({"events": []}))
             .await;
 
         // Verify data exists
-        assert!(cache.get("run:events:123").await.is_some());
+        assert!(cache.get(&context, "run:events:123").await.is_some());
 
         // Wait for expiration
         sleep(Duration::from_millis(100)).await;
 
         // Verify data expired
-        assert!(cache.get("run:events:123").await.is_none());
+        assert!(cache.get(&context, "run:events:123").await.is_none());
     }
 
     #[tokio::test]
     async fn test_plm_cache_warming() {
         let cache = PlmCache::new();
+        let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
         let pipeline_ids = vec!["pipe1".to_string(), "pipe2".to_string()];
 
         // Warm cache
-        cache.warm_cache(&pipeline_ids).await;
+        cache.warm_cache(&context, &pipeline_ids).await;
 
         // Verify pipeline definitions were cached
-        assert!(cache.get("pipeline:def:pipe1").await.is_some());
-        assert!(cache.get("pipeline:def:pipe2").await.is_some());
-        assert!(cache.get("pipelines:list").await.is_some());
+        assert!(cache.get(&context, "pipeline:def:pipe1").await.is_some());
+        assert!(cache.get(&context, "pipeline:def:pipe2").await.is_some());
+        assert!(cache.get(&context, "pipelines:list").await.is_some());
     }
 
     #[tokio::test]
     async fn test_plm_cache_stats() {
         let cache = PlmCache::new();
+        let context = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
 
         // Generate cache hits and misses
-        cache.get("nonexistent").await; // miss
+        cache.get(&context, "nonexistent").await; // miss
         cache
-            .insert("test:key".to_string(), json!({"data": "test"}))
+            .insert(&context, "test:key".to_string(), json!({"data": "test"}))
             .await; // insertion
-        cache.get("test:key").await; // hit
+        cache.get(&context, "test:key").await; // hit
 
         let stats = cache.get_stats().await;
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.insertions, 1);
         assert!(stats.hit_rate() > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_cache_context_isolation() {
+        let cache = PlmCache::new();
+        let context1 = CacheContext::new("user1".to_string(), "org1".to_string(), "dev".to_string());
+        let context2 = CacheContext::new("user2".to_string(), "org1".to_string(), "dev".to_string());
+        let test_data = json!({"test": "data"});
+
+        // Insert data for user1
+        cache
+            .insert(&context1, "pipeline:def:test".to_string(), test_data.clone())
+            .await;
+
+        // Verify user1 can access the data
+        assert_eq!(cache.get(&context1, "pipeline:def:test").await, Some(test_data.clone()));
+
+        // Verify user2 cannot access user1's data
+        assert_eq!(cache.get(&context2, "pipeline:def:test").await, None);
+
+        // Insert different data for user2
+        let user2_data = json!({"user2": "data"});
+        cache
+            .insert(&context2, "pipeline:def:test".to_string(), user2_data.clone())
+            .await;
+
+        // Verify both users have isolated data
+        assert_eq!(cache.get(&context1, "pipeline:def:test").await, Some(test_data));
+        assert_eq!(cache.get(&context2, "pipeline:def:test").await, Some(user2_data));
     }
 }

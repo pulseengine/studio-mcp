@@ -13,6 +13,60 @@ use std::time::{Duration, Instant};
 pub mod plm_cache;
 pub use plm_cache::PlmCache;
 
+/// User context for cache isolation
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CacheContext {
+    /// User identifier (username or user ID)
+    pub user_id: String,
+    /// Organization/instance identifier
+    pub org_id: String,
+    /// Environment (dev, staging, prod)
+    pub environment: String,
+}
+
+impl CacheContext {
+    /// Create a new cache context
+    pub fn new(user_id: String, org_id: String, environment: String) -> Self {
+        Self {
+            user_id,
+            org_id,
+            environment,
+        }
+    }
+
+    /// Create a cache context from auth credentials
+    pub fn from_auth(instance_id: &str, username: &str, environment: &str) -> Self {
+        Self {
+            user_id: username.to_string(),
+            org_id: instance_id.to_string(),
+            environment: environment.to_string(),
+        }
+    }
+
+    /// Generate cache key prefix with user context
+    pub fn cache_prefix(&self) -> String {
+        format!("user:{}:org:{}:env:{}", 
+            self.sanitize_key_component(&self.user_id),
+            self.sanitize_key_component(&self.org_id),
+            self.sanitize_key_component(&self.environment)
+        )
+    }
+
+    /// Sanitize cache key components to prevent collision
+    fn sanitize_key_component(&self, component: &str) -> String {
+        component
+            .chars()
+            .map(|c| match c {
+                ':' => '_',
+                ' ' => '_',
+                '\t' | '\n' | '\r' => '_',
+                c if c.is_alphanumeric() || c == '-' || c == '.' => c,
+                _ => '_',
+            })
+            .collect()
+    }
+}
+
 /// Cache item with metadata
 #[derive(Debug, Clone)]
 pub struct CachedItem {

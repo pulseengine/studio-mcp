@@ -1,6 +1,6 @@
 //! PLM (Pipeline Management) resource provider
 
-use crate::cache::PlmCache;
+use crate::cache::{CacheContext, PlmCache};
 use pulseengine_mcp_protocol::{Content, Resource};
 use serde_json::Value;
 use std::sync::Arc;
@@ -39,17 +39,30 @@ impl PlmResourceProvider {
 
     /// Invalidate cache when pipeline state changes (e.g., after run starts/completes)
     pub async fn invalidate_pipeline_cache(&self, pipeline_id: &str) {
-        self.cache.invalidate_pipeline(pipeline_id).await;
+        let context = self.get_cache_context();
+        self.cache.invalidate_pipeline(&context, pipeline_id).await;
     }
 
     /// Invalidate cache when run state changes
     pub async fn invalidate_run_cache(&self, run_id: &str) {
-        self.cache.invalidate_run(run_id).await;
+        let context = self.get_cache_context();
+        self.cache.invalidate_run(&context, run_id).await;
     }
 
     /// Clean up expired cache entries
     pub async fn cleanup_cache(&self) -> usize {
         self.cache.cleanup_expired().await
+    }
+
+    /// Create a default cache context - TODO: integrate with actual authentication
+    fn get_cache_context(&self) -> CacheContext {
+        // TODO: Extract this from actual user authentication context
+        // For now, use a default context until auth integration is complete
+        CacheContext::new(
+            "default_user".to_string(),
+            "default_org".to_string(), 
+            "default_env".to_string()
+        )
     }
 
     pub async fn list_resources(&self) -> Result<Vec<Resource>> {
@@ -420,10 +433,11 @@ impl PlmResourceProvider {
 
     // CLI interaction methods
     async fn get_pipeline_list(&self) -> Result<Vec<Value>> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::pipeline_list_key();
         
         // Try cache first
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             if let Some(pipelines) = cached_value.get("pipelines").and_then(|v| v.as_array()) {
                 debug!("Returning cached pipeline list ({} pipelines)", pipelines.len());
                 return Ok(pipelines.clone());
@@ -455,7 +469,7 @@ impl PlmResourceProvider {
                     "total": pipelines.len(),
                     "cached_at": chrono::Utc::now().to_rfc3339()
                 });
-                self.cache.insert(cache_key, cache_data).await;
+                self.cache.insert(&context, cache_key, cache_data).await;
 
                 debug!("Fetched and cached {} pipelines", pipelines.len());
                 Ok(pipelines)
@@ -468,10 +482,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_definition(&self, pipeline_id: &str) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::pipeline_definition_key(pipeline_id);
         
         // Try cache first (pipeline definitions are immutable)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached pipeline definition for: {}", pipeline_id);
             return Ok(cached_value);
         }
@@ -486,7 +501,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (immutable data)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached pipeline definition for: {}", pipeline_id);
                 Ok(result)
             }
@@ -495,10 +510,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_runs(&self, pipeline_id: &str) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::pipeline_runs_key(pipeline_id);
         
         // Try cache first (semi-dynamic data)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached pipeline runs for: {}", pipeline_id);
             return Ok(cached_value);
         }
@@ -521,7 +537,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (semi-dynamic data)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached pipeline runs for: {}", pipeline_id);
                 Ok(result)
             }
@@ -530,10 +546,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_events(&self, pipeline_id: &str) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::pipeline_events_key(pipeline_id);
         
         // Try cache first (dynamic data - short TTL)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached pipeline events for: {}", pipeline_id);
             return Ok(cached_value);
         }
@@ -556,7 +573,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (dynamic data)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached pipeline events for: {}", pipeline_id);
                 Ok(result)
             }
@@ -565,10 +582,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_run_details(&self, _pipeline_id: &str, run_id: &str) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::run_details_key(run_id);
         
         // Try cache first - check if run is completed for better caching
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached run details for: {}", run_id);
             return Ok(cached_value);
         }
@@ -580,7 +598,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result - let cache type detection handle TTL based on run status
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached run details for: {}", run_id);
                 Ok(result)
             }
@@ -589,10 +607,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_all_runs(&self) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::all_runs_key();
         
         // Try cache first (semi-dynamic data)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached all runs list");
             return Ok(cached_value);
         }
@@ -604,7 +623,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (semi-dynamic data)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached all runs list");
                 Ok(result)
             }
@@ -618,10 +637,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_all_tasks(&self) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::tasks_key();
         
         // Try cache first (immutable/semi-static data)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached tasks list");
             return Ok(cached_value);
         }
@@ -633,7 +653,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (task libraries are relatively static)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached tasks list");
                 Ok(result)
             }
@@ -642,10 +662,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_task_details(&self, task_id: &str) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = format!("task:details:{}", task_id);
         
         // Try cache first (task details are immutable)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached task details for: {}", task_id);
             return Ok(cached_value);
         }
@@ -657,7 +678,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (task definitions are immutable)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached task details for: {}", task_id);
                 Ok(result)
             }
@@ -666,10 +687,11 @@ impl PlmResourceProvider {
     }
 
     async fn get_pipeline_resources(&self) -> Result<Value> {
+        let context = self.get_cache_context();
         let cache_key = PlmCache::pipeline_resources_key();
         
         // Try cache first (semi-dynamic data)
-        if let Some(cached_value) = self.cache.get(&cache_key).await {
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
             debug!("Returning cached pipeline resources");
             return Ok(cached_value);
         }
@@ -681,7 +703,7 @@ impl PlmResourceProvider {
         {
             Ok(result) => {
                 // Cache the result (resource assignments change semi-frequently)
-                self.cache.insert(cache_key, result.clone()).await;
+                self.cache.insert(&context, cache_key, result.clone()).await;
                 debug!("Fetched and cached pipeline resources");
                 Ok(result)
             }
