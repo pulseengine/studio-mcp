@@ -22,13 +22,11 @@ function getPlatform() {
     throw new Error(`Unsupported platform: ${type}`);
   }
 
-  // Determine architecture
+  // Determine architecture - only support x64 for now
   if (arch === "x64") {
     archSuffix = "x86_64";
-  } else if (arch === "arm64") {
-    archSuffix = "aarch64";
   } else {
-    throw new Error(`Unsupported architecture: ${arch}`);
+    throw new Error(`Unsupported architecture: ${arch}. Only x64 is currently supported. Please install from source: cargo install --git https://github.com/pulseengine/studio-mcp.git studio-mcp-server`);
   }
 
   return `${archSuffix}-${platform}`;
