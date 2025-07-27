@@ -1,11 +1,14 @@
 //! PLM (Pipeline Management) resource provider
 
+#![allow(dead_code)]
+
 use crate::auth_middleware::AuthMiddleware;
-use crate::cache::{CacheContext, PlmCache};
+use crate::cache::{CacheContext, CacheInvalidationService, PlmCache};
 use pulseengine_mcp_protocol::{Content, Resource};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
-use studio_cli_manager::CliManager;
+use studio_cli_manager::{CliManager, OperationHook};
 use studio_mcp_shared::{ResourceUri, Result, StudioConfig, StudioError};
 use tracing::{debug, warn};
 
@@ -15,6 +18,7 @@ pub struct PlmResourceProvider {
     config: StudioConfig,
     cache: Arc<PlmCache>,
     auth_middleware: Option<Arc<AuthMiddleware>>,
+    invalidation_service: Option<Arc<CacheInvalidationService>>,
 }
 
 impl PlmResourceProvider {
@@ -24,6 +28,7 @@ impl PlmResourceProvider {
             config,
             cache: Arc::new(PlmCache::new()),
             auth_middleware: None,
+            invalidation_service: None,
         }
     }
 
@@ -37,12 +42,95 @@ impl PlmResourceProvider {
             config,
             cache,
             auth_middleware: None,
+            invalidation_service: None,
         }
     }
 
     /// Set the authentication middleware for user context extraction
     pub fn with_auth(mut self, auth_middleware: Arc<AuthMiddleware>) -> Self {
         self.auth_middleware = Some(auth_middleware);
+        self
+    }
+
+    /// Enable cache invalidation with automatic CLI operation detection
+    pub async fn with_cache_invalidation(mut self) -> Self {
+        let invalidation_service = Arc::new(CacheInvalidationService::new(self.cache.clone()));
+
+        // Create a hook that will trigger cache invalidation
+        let hook_service = invalidation_service.clone();
+        let hook: OperationHook = Arc::new(
+            move |operation: &str, args: &[&str], _result: &serde_json::Value| {
+                let service = hook_service.clone();
+                let operation = operation.to_string();
+                let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+                // Spawn async task to handle invalidation
+                tokio::spawn(async move {
+                    let context = CacheContext::new(
+                        "authenticated_user".to_string(),
+                        "default_org".to_string(),
+                        "production".to_string(),
+                    );
+
+                    // Extract parameters from CLI arguments
+                    let mut parameters = HashMap::new();
+
+                    // Extract pipeline ID from various argument patterns
+                    if let Some(pipeline_idx) = args_vec
+                        .iter()
+                        .position(|arg| arg == "--pipeline" || arg == "-p")
+                    {
+                        if let Some(pipeline_id) = args_vec.get(pipeline_idx + 1) {
+                            parameters.insert("pipeline_id".to_string(), pipeline_id.clone());
+                        }
+                    }
+
+                    // Extract run ID
+                    if let Some(run_idx) = args_vec
+                        .iter()
+                        .position(|arg| arg == "--run" || arg == "-r")
+                    {
+                        if let Some(run_id) = args_vec.get(run_idx + 1) {
+                            parameters.insert("run_id".to_string(), run_id.clone());
+                        }
+                    }
+
+                    // Extract entity name from positional arguments (e.g., "plm pipeline create my-pipeline")
+                    if args_vec.len() >= 4
+                        && args_vec[0] == "plm"
+                        && (args_vec[1] == "pipeline"
+                            || (args_vec[1] == "run" && args_vec[2] == "start"))
+                    {
+                        parameters.insert("pipeline_id".to_string(), args_vec[3].clone());
+                    }
+
+                    let result = service
+                        .process_operation(&context, &operation, &parameters)
+                        .await;
+                    debug!(
+                        "Cache invalidation for '{}': {} entries invalidated, {} patterns matched",
+                        operation,
+                        result.entries_invalidated,
+                        result.matched_patterns.len()
+                    );
+
+                    if !result.errors.is_empty() {
+                        warn!(
+                            "Cache invalidation errors for '{}': {:?}",
+                            operation, result.errors
+                        );
+                    }
+                });
+            },
+        );
+
+        // Register the hook with the CLI manager
+        let cli_manager = self.cli_manager.clone();
+        tokio::spawn(async move {
+            cli_manager.register_operation_hook(hook).await;
+        });
+
+        self.invalidation_service = Some(invalidation_service);
         self
     }
 
@@ -690,7 +778,7 @@ impl PlmResourceProvider {
 
     async fn get_task_details(&self, task_id: &str) -> Result<Value> {
         let context = self.get_cache_context();
-        let cache_key = format!("task:details:{}", task_id);
+        let cache_key = format!("task:details:{task_id}");
 
         // Try cache first (task details are immutable)
         if let Some(cached_value) = self.cache.get(&context, &cache_key).await {

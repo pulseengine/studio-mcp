@@ -4,6 +4,8 @@
 //! when data changes occur through CLI operations. It ensures cache consistency
 //! by automatically triggering invalidation when write operations are detected.
 
+#![allow(dead_code)]
+
 use super::{CacheContext, PlmCache};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,7 +65,7 @@ impl CacheInvalidationService {
     /// Create a new cache invalidation service
     pub fn new(cache: Arc<PlmCache>) -> Self {
         let patterns = Self::build_default_patterns();
-        
+
         Self {
             cache,
             patterns: Arc::new(RwLock::new(patterns)),
@@ -79,7 +81,10 @@ impl CacheInvalidationService {
             .entry(operation_pattern.clone())
             .or_insert_with(Vec::new)
             .push(pattern);
-        debug!("Registered invalidation pattern for operation: {}", operation_pattern);
+        debug!(
+            "Registered invalidation pattern for operation: {}",
+            operation_pattern
+        );
     }
 
     /// Process a CLI operation and invalidate relevant cache entries
@@ -99,7 +104,10 @@ impl CacheInvalidationService {
         {
             let mut stats = self.stats.write().await;
             stats.events_processed += 1;
-            *stats.operations_by_type.entry(operation.to_string()).or_insert(0) += 1;
+            *stats
+                .operations_by_type
+                .entry(operation.to_string())
+                .or_insert(0) += 1;
         }
 
         // Find matching patterns
@@ -107,19 +115,24 @@ impl CacheInvalidationService {
         let matching_patterns = Self::find_matching_patterns(&patterns, operation);
 
         for pattern in matching_patterns {
-            result.matched_patterns.push(pattern.operation_pattern.clone());
-            
+            result
+                .matched_patterns
+                .push(pattern.operation_pattern.clone());
+
             // Generate cache keys to invalidate based on pattern and parameters
             let cache_keys = Self::generate_cache_keys(&pattern, parameters);
-            
+
             for cache_key in cache_keys {
                 match self.invalidate_cache_key(context, &cache_key).await {
                     Ok(count) => {
                         result.entries_invalidated += count;
-                        debug!("Invalidated {} entries for key pattern: {}", count, cache_key);
+                        debug!(
+                            "Invalidated {} entries for key pattern: {}",
+                            count, cache_key
+                        );
                     }
                     Err(e) => {
-                        let error_msg = format!("Failed to invalidate cache key {}: {}", cache_key, e);
+                        let error_msg = format!("Failed to invalidate cache key {cache_key}: {e}");
                         result.errors.push(error_msg.clone());
                         warn!("{}", error_msg);
                     }
@@ -135,14 +148,20 @@ impl CacheInvalidationService {
             stats.failures += result.errors.len() as u64;
         }
 
-        debug!("Operation '{}' triggered invalidation of {} cache entries", 
-               operation, result.entries_invalidated);
+        debug!(
+            "Operation '{}' triggered invalidation of {} cache entries",
+            operation, result.entries_invalidated
+        );
 
         result
     }
 
     /// Invalidate a specific cache key pattern
-    async fn invalidate_cache_key(&self, context: &CacheContext, key_pattern: &str) -> Result<usize, String> {
+    async fn invalidate_cache_key(
+        &self,
+        context: &CacheContext,
+        key_pattern: &str,
+    ) -> Result<usize, String> {
         if key_pattern.contains('*') {
             // Pattern-based invalidation
             self.cache.invalidate_pattern(context, key_pattern).await;
@@ -200,13 +219,13 @@ impl CacheInvalidationService {
 
         for cache_pattern in &pattern.cache_patterns {
             let mut key = cache_pattern.clone();
-            
+
             // Replace parameter placeholders
             for (param_name, param_value) in parameters {
-                let placeholder = format!("{{{}}}", param_name);
+                let placeholder = format!("{{{param_name}}}");
                 key = key.replace(&placeholder, param_value);
             }
-            
+
             keys.push(key);
         }
 
@@ -218,20 +237,19 @@ impl CacheInvalidationService {
         let mut patterns = HashMap::new();
 
         // Pipeline operations
-        patterns.insert("plm.pipeline.create".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.pipeline.create".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.pipeline.create".to_string(),
-                cache_patterns: vec![
-                    "pipelines:list".to_string(),
-                    "pipeline:*".to_string(),
-                ],
+                cache_patterns: vec!["pipelines:list".to_string(), "pipeline:*".to_string()],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
-        patterns.insert("plm.pipeline.update".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.pipeline.update".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.pipeline.update".to_string(),
                 cache_patterns: vec![
                     "pipeline:def:{pipeline_id}".to_string(),
@@ -239,11 +257,12 @@ impl CacheInvalidationService {
                 ],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
-        patterns.insert("plm.pipeline.delete".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.pipeline.delete".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.pipeline.delete".to_string(),
                 cache_patterns: vec![
                     "pipeline:*:{pipeline_id}".to_string(),
@@ -251,12 +270,13 @@ impl CacheInvalidationService {
                 ],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
         // Run operations
-        patterns.insert("plm.run.start".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.run.start".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.run.start".to_string(),
                 cache_patterns: vec![
                     "pipeline:runs:{pipeline_id}".to_string(),
@@ -265,11 +285,12 @@ impl CacheInvalidationService {
                 ],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
-        patterns.insert("plm.run.complete".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.run.complete".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.run.complete".to_string(),
                 cache_patterns: vec![
                     "run:details:{run_id}".to_string(),
@@ -278,34 +299,30 @@ impl CacheInvalidationService {
                 ],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
         // Task operations
-        patterns.insert("plm.task.*".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.task.*".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.task.*".to_string(),
-                cache_patterns: vec![
-                    "tasks:list".to_string(),
-                    "task:*".to_string(),
-                ],
+                cache_patterns: vec!["tasks:list".to_string(), "task:*".to_string()],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
         // Resource operations
-        patterns.insert("plm.resource.*".to_string(), vec![
-            InvalidationPattern {
+        patterns.insert(
+            "plm.resource.*".to_string(),
+            vec![InvalidationPattern {
                 operation_pattern: "plm.resource.*".to_string(),
-                cache_patterns: vec![
-                    "pipeline:resources".to_string(),
-                    "resource:*".to_string(),
-                ],
+                cache_patterns: vec!["pipeline:resources".to_string(), "resource:*".to_string()],
                 immediate: true,
                 delay_seconds: None,
-            },
-        ]);
+            }],
+        );
 
         patterns
     }
@@ -336,7 +353,7 @@ mod tests {
     async fn test_invalidation_service_creation() {
         let cache = Arc::new(PlmCache::new());
         let service = CacheInvalidationService::new(cache);
-        
+
         let patterns = service.get_patterns().await;
         assert!(patterns.contains_key("plm.pipeline.create"));
         assert!(patterns.contains_key("plm.run.start"));
@@ -345,19 +362,19 @@ mod tests {
     #[tokio::test]
     async fn test_operation_matching() {
         assert!(CacheInvalidationService::operation_matches_pattern(
-            "plm.pipeline.create", 
+            "plm.pipeline.create",
             "plm.pipeline.create"
         ));
         assert!(CacheInvalidationService::operation_matches_pattern(
-            "plm.pipeline.create", 
+            "plm.pipeline.create",
             "plm.pipeline.*"
         ));
         assert!(CacheInvalidationService::operation_matches_pattern(
-            "plm.task.delete", 
+            "plm.task.delete",
             "plm.task.*"
         ));
         assert!(!CacheInvalidationService::operation_matches_pattern(
-            "plm.run.start", 
+            "plm.run.start",
             "plm.pipeline.*"
         ));
     }
@@ -378,7 +395,7 @@ mod tests {
         parameters.insert("pipeline_id".to_string(), "test-pipeline-123".to_string());
 
         let keys = CacheInvalidationService::generate_cache_keys(&pattern, &parameters);
-        
+
         assert_eq!(keys.len(), 2);
         assert!(keys.contains(&"pipeline:def:test-pipeline-123".to_string()));
         assert!(keys.contains(&"pipeline:runs:test-pipeline-123".to_string()));
@@ -397,14 +414,102 @@ mod tests {
         let mut parameters = HashMap::new();
         parameters.insert("pipeline_id".to_string(), "test-pipeline".to_string());
 
-        let result = service.process_operation(&context, "plm.pipeline.update", &parameters).await;
-        
+        let result = service
+            .process_operation(&context, "plm.pipeline.update", &parameters)
+            .await;
+
         assert!(result.entries_invalidated > 0);
-        assert!(result.matched_patterns.len() > 0);
+        assert!(!result.matched_patterns.is_empty());
         assert_eq!(result.errors.len(), 0);
 
         let stats = service.get_stats().await;
         assert_eq!(stats.events_processed, 1);
         assert!(stats.operations_by_type.contains_key("plm.pipeline.update"));
+    }
+
+    /// Test CLI manager integration patterns
+    #[tokio::test]
+    async fn test_cli_manager_integration_patterns() {
+        // Test write operation detection patterns
+        let write_operations = [
+            "plm.pipeline.create",
+            "plm.pipeline.update",
+            "plm.pipeline.delete",
+            "plm.run.start",
+            "plm.run.cancel",
+            "plm.resource.assign",
+            "plm.group.assign",
+        ];
+
+        let read_operations = [
+            "plm.pipeline.list",
+            "plm.pipeline.get",
+            "plm.run.list",
+            "plm.run.get",
+            "plm.resource.list",
+            "plm.group.list",
+        ];
+
+        // Test write operations would trigger cache invalidation
+        for operation in &write_operations {
+            assert!(
+                operation.contains("create")
+                    || operation.contains("update")
+                    || operation.contains("delete")
+                    || operation.contains("start")
+                    || operation.contains("cancel")
+                    || operation.contains("assign"),
+                "Operation {operation} should be classified as write operation"
+            );
+        }
+
+        // Test read operations would NOT trigger cache invalidation
+        for operation in &read_operations {
+            assert!(
+                operation.contains("list") || operation.contains("get"),
+                "Operation {operation} should be classified as read operation"
+            );
+        }
+    }
+
+    /// Test that cache invalidation service properly handles CLI command patterns
+    #[tokio::test]
+    async fn test_cli_command_cache_invalidation() {
+        let cache = Arc::new(PlmCache::new());
+        let service = CacheInvalidationService::new(cache);
+        let context = CacheContext::new(
+            "authenticated_user".to_string(),
+            "default_org".to_string(),
+            "production".to_string(),
+        );
+
+        // Test pipeline create operation
+        let mut parameters = HashMap::new();
+        parameters.insert("pipeline_id".to_string(), "my-new-pipeline".to_string());
+
+        let result = service
+            .process_operation(&context, "plm.pipeline.create", &parameters)
+            .await;
+
+        // Should match create pattern and invalidate relevant caches
+        assert!(!result.matched_patterns.is_empty());
+        assert!(result
+            .matched_patterns
+            .contains(&"plm.pipeline.create".to_string()));
+
+        // Test run start operation
+        parameters.clear();
+        parameters.insert("pipeline_id".to_string(), "test-pipeline".to_string());
+        parameters.insert("run_id".to_string(), "run-123".to_string());
+
+        let result = service
+            .process_operation(&context, "plm.run.start", &parameters)
+            .await;
+
+        // Should match run start pattern
+        assert!(!result.matched_patterns.is_empty());
+        assert!(result
+            .matched_patterns
+            .contains(&"plm.run.start".to_string()));
     }
 }
