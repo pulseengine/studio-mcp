@@ -11,7 +11,12 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 pub mod plm_cache;
+pub mod sensitive_filter;
+pub mod invalidation_service;
+
 pub use plm_cache::PlmCache;
+pub use sensitive_filter::SensitiveDataFilter;
+pub use invalidation_service::{CacheInvalidationService, InvalidationPattern, InvalidationStats};
 
 /// User context for cache isolation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

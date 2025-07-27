@@ -6,7 +6,7 @@
 //! - Cache warming for frequently accessed resources
 //! - Integration with CLI command patterns
 
-use super::{CacheConfig, CacheContext, CacheStats, CacheStore, CacheType, CachedItem};
+use super::{CacheConfig, CacheContext, CacheStats, CacheStore, CacheType, CachedItem, SensitiveDataFilter};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,6 +21,8 @@ pub struct PlmCache {
     config: CacheConfig,
     /// Statistics tracking
     stats: Arc<RwLock<CacheStats>>,
+    /// Sensitive data filter for security
+    sensitive_filter: SensitiveDataFilter,
 }
 
 impl PlmCache {
@@ -50,6 +52,7 @@ impl PlmCache {
             stores,
             config,
             stats: Arc::new(RwLock::new(CacheStats::default())),
+            sensitive_filter: SensitiveDataFilter::new(),
         }
     }
 
@@ -88,6 +91,12 @@ impl PlmCache {
             return;
         }
 
+        // Check if this key should be skipped due to sensitive data
+        if self.sensitive_filter.should_skip_caching(&key) {
+            debug!("Skipping cache insertion for sensitive key: {}", key);
+            return;
+        }
+
         let full_key = self.build_cache_key(context, &key);
         let cache_type = Self::detect_cache_type(&key);
         let store = match self.stores.get(&cache_type) {
@@ -98,8 +107,11 @@ impl PlmCache {
             }
         };
 
+        // Filter sensitive data from the value before caching
+        let filtered_value = self.sensitive_filter.filter_value(&value);
+
         // Check for custom TTL override
-        let mut item = CachedItem::new(value, cache_type);
+        let mut item = CachedItem::new(filtered_value, cache_type);
         if let Some(custom_ttl) = self.config.custom_ttl.get(&cache_type) {
             item.ttl = *custom_ttl;
         }

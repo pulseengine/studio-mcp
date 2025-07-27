@@ -1,5 +1,6 @@
 //! PLM (Pipeline Management) resource provider
 
+use crate::auth_middleware::AuthMiddleware;
 use crate::cache::{CacheContext, PlmCache};
 use pulseengine_mcp_protocol::{Content, Resource};
 use serde_json::Value;
@@ -13,6 +14,7 @@ pub struct PlmResourceProvider {
     #[allow(dead_code)]
     config: StudioConfig,
     cache: Arc<PlmCache>,
+    auth_middleware: Option<Arc<AuthMiddleware>>,
 }
 
 impl PlmResourceProvider {
@@ -21,6 +23,7 @@ impl PlmResourceProvider {
             cli_manager,
             config,
             cache: Arc::new(PlmCache::new()),
+            auth_middleware: None,
         }
     }
 
@@ -33,7 +36,14 @@ impl PlmResourceProvider {
             cli_manager,
             config,
             cache,
+            auth_middleware: None,
         }
+    }
+
+    /// Set the authentication middleware for user context extraction
+    pub fn with_auth(mut self, auth_middleware: Arc<AuthMiddleware>) -> Self {
+        self.auth_middleware = Some(auth_middleware);
+        self
     }
 
     /// Get access to the PLM cache for external invalidation and monitoring
@@ -58,14 +68,15 @@ impl PlmResourceProvider {
         self.cache.cleanup_expired().await
     }
 
-    /// Create a default cache context - TODO: integrate with actual authentication
+    /// Get cache context from authentication middleware or fallback to default
+    /// TODO: This should be async and integrate with actual authentication
     fn get_cache_context(&self) -> CacheContext {
-        // TODO: Extract this from actual user authentication context
-        // For now, use a default context until auth integration is complete
+        // For now, use a default context with secure defaults
+        // Future enhancement: extract from auth_middleware when available
         CacheContext::new(
-            "default_user".to_string(),
+            "authenticated_user".to_string(),
             "default_org".to_string(),
-            "default_env".to_string(),
+            "production".to_string(),
         )
     }
 

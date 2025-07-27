@@ -16,6 +16,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
+regex = { workspace = true }
 
 # MCP dependencies
 pulseengine-mcp-server = { workspace = true }
