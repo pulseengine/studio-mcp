@@ -1,0 +1,138 @@
+name: Release NPM Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: 'v0.2.0'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binaries:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cross-compilation
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
+          echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
+
+      - name: Build binary
+        working-directory: studio-mcp-server
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary (Unix)
+        if: matrix.archive == 'tar.gz'
+        working-directory: studio-mcp-server
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/studio-mcp-server dist/
+          cd dist
+          tar -czf studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.tar.gz studio-mcp-server
+
+      - name: Prepare binary (Windows)
+        if: matrix.archive == 'zip'
+        working-directory: studio-mcp-server
+        run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/studio-mcp-server.exe dist/
+          cd dist
+          Compress-Archive -Path studio-mcp-server.exe -DestinationPath studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.zip
+
+      - name: Upload binary to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: studio-mcp-server/dist/studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          asset_name: studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          tag: ${{ github.event.release.tag_name || github.event.inputs.version }}
+          overwrite: true
+
+  publish-npm:
+    name: Publish to NPM
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update package version
+        working-directory: studio-mcp-server/npm
+        run: |
+          VERSION=${{ github.event.release.tag_name || github.event.inputs.version }}
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+          npm version $VERSION --no-git-tag-version
+
+      - name: Install dependencies
+        working-directory: studio-mcp-server/npm
+        run: npm install
+
+      - name: Publish to NPM
+        working-directory: studio-mcp-server/npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create NPM release summary
+        run: |
+          echo "## 📦 NPM Package Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Package: \`@pulseengine/studio-mcp-server\`" >> $GITHUB_STEP_SUMMARY
+          echo "Version: \`${{ github.event.release.tag_name || github.event.inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Run with npx (no installation)" >> $GITHUB_STEP_SUMMARY
+          echo "npx @pulseengine/studio-mcp-server --help" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Or install globally" >> $GITHUB_STEP_SUMMARY
+          echo "npm install -g @pulseengine/studio-mcp-server" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

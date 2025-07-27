@@ -1,0 +1,31 @@
+# Source files
+src/
+target/
+Cargo.toml
+Cargo.lock
+
+# Development files
+.gitignore
+.git/
+tests/
+examples/
+
+# Documentation (except README)
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.travis.yml
+appveyor.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
