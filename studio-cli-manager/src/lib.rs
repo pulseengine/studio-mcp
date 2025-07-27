@@ -123,7 +123,10 @@ impl CliManager {
         operation = operation_parts.join(".");
 
         // Extract common parameters that might be useful for cache invalidation
-        if let Some(pipeline_idx) = args.iter().position(|&arg| arg == "--pipeline" || arg == "-p") {
+        if let Some(pipeline_idx) = args
+            .iter()
+            .position(|&arg| arg == "--pipeline" || arg == "-p")
+        {
             if let Some(pipeline_id) = args.get(pipeline_idx + 1) {
                 parameters.insert("pipeline_id".to_string(), pipeline_id.to_string());
             }
@@ -136,7 +139,10 @@ impl CliManager {
         }
 
         // For commands like "plm pipeline create my-pipeline", extract the pipeline name
-        if operation_parts.len() >= 3 && operation_parts[0] == "plm" && operation_parts[1] == "pipeline" {
+        if operation_parts.len() >= 3
+            && operation_parts[0] == "plm"
+            && operation_parts[1] == "pipeline"
+        {
             if let Some(pipeline_name) = operation_parts.get(3) {
                 parameters.insert("pipeline_name".to_string(), pipeline_name.to_string());
             }
@@ -148,12 +154,30 @@ impl CliManager {
     /// Check if an operation is a write operation that should trigger cache invalidation
     fn is_write_operation(operation: &str) -> bool {
         let write_operations = [
-            "create", "update", "delete", "start", "stop", "cancel", "complete",
-            "assign", "revoke", "lock", "unlock", "import", "export", "deploy",
-            "install", "uninstall", "enable", "disable", "restart"
+            "create",
+            "update",
+            "delete",
+            "start",
+            "stop",
+            "cancel",
+            "complete",
+            "assign",
+            "revoke",
+            "lock",
+            "unlock",
+            "import",
+            "export",
+            "deploy",
+            "install",
+            "uninstall",
+            "enable",
+            "disable",
+            "restart",
         ];
 
-        write_operations.iter().any(|&write_op| operation.contains(write_op))
+        write_operations
+            .iter()
+            .any(|&write_op| operation.contains(write_op))
     }
 
     /// Execute a CLI command
@@ -164,15 +188,16 @@ impl CliManager {
     ) -> Result<serde_json::Value> {
         let cli_path = self.ensure_cli(None).await?;
         let result = self.executor.execute(&cli_path, args, working_dir).await?;
-        
+
         // Extract operation information for hooks
         let (operation, _parameters) = Self::extract_operation_info(args);
-        
+
         // Only trigger hooks for write operations
         if Self::is_write_operation(&operation) {
-            self.trigger_operation_hooks(&operation, args, &result).await;
+            self.trigger_operation_hooks(&operation, args, &result)
+                .await;
         }
-        
+
         Ok(result)
     }
 
