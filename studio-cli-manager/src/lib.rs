@@ -11,8 +11,14 @@ pub use executor::CliExecutor;
 pub use version::VersionManager;
 
 use directories::ProjectDirs;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use studio_mcp_shared::Result;
+use tokio::sync::RwLock;
+
+/// Hook function type for CLI operation callbacks
+pub type OperationHook = Arc<dyn Fn(&str, &[&str], &serde_json::Value) + Send + Sync>;
 
 /// Main CLI manager that orchestrates CLI operations
 pub struct CliManager {
@@ -20,6 +26,8 @@ pub struct CliManager {
     executor: CliExecutor,
     version_manager: VersionManager,
     install_dir: PathBuf,
+    /// Hooks that are called after CLI operations complete
+    operation_hooks: Arc<RwLock<Vec<OperationHook>>>,
 }
 
 impl CliManager {
@@ -38,6 +46,7 @@ impl CliManager {
             executor: CliExecutor::new(install_dir.clone()),
             version_manager: VersionManager::new(install_dir.clone()),
             install_dir,
+            operation_hooks: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -79,6 +88,74 @@ impl CliManager {
         Ok(cli_path)
     }
 
+    /// Register an operation hook that will be called after CLI operations
+    pub async fn register_operation_hook(&self, hook: OperationHook) {
+        let mut hooks = self.operation_hooks.write().await;
+        hooks.push(hook);
+    }
+
+    /// Extract operation name and parameters from CLI arguments
+    fn extract_operation_info(args: &[&str]) -> (String, HashMap<String, String>) {
+        let mut operation = String::new();
+        let mut parameters = HashMap::new();
+
+        if args.is_empty() {
+            return (operation, parameters);
+        }
+
+        // Build operation name from command structure
+        let mut operation_parts = Vec::new();
+        let mut param_key: Option<String> = None;
+
+        for arg in args {
+            if arg.starts_with("--") {
+                // This is a parameter flag
+                param_key = Some(arg.trim_start_matches("--").to_string());
+            } else if let Some(key) = param_key.take() {
+                // This is a parameter value
+                parameters.insert(key, arg.to_string());
+            } else {
+                // This is part of the operation
+                operation_parts.push(arg.to_string());
+            }
+        }
+
+        operation = operation_parts.join(".");
+
+        // Extract common parameters that might be useful for cache invalidation
+        if let Some(pipeline_idx) = args.iter().position(|&arg| arg == "--pipeline" || arg == "-p") {
+            if let Some(pipeline_id) = args.get(pipeline_idx + 1) {
+                parameters.insert("pipeline_id".to_string(), pipeline_id.to_string());
+            }
+        }
+
+        if let Some(run_idx) = args.iter().position(|&arg| arg == "--run" || arg == "-r") {
+            if let Some(run_id) = args.get(run_idx + 1) {
+                parameters.insert("run_id".to_string(), run_id.to_string());
+            }
+        }
+
+        // For commands like "plm pipeline create my-pipeline", extract the pipeline name
+        if operation_parts.len() >= 3 && operation_parts[0] == "plm" && operation_parts[1] == "pipeline" {
+            if let Some(pipeline_name) = operation_parts.get(3) {
+                parameters.insert("pipeline_name".to_string(), pipeline_name.to_string());
+            }
+        }
+
+        (operation, parameters)
+    }
+
+    /// Check if an operation is a write operation that should trigger cache invalidation
+    fn is_write_operation(operation: &str) -> bool {
+        let write_operations = [
+            "create", "update", "delete", "start", "stop", "cancel", "complete",
+            "assign", "revoke", "lock", "unlock", "import", "export", "deploy",
+            "install", "uninstall", "enable", "disable", "restart"
+        ];
+
+        write_operations.iter().any(|&write_op| operation.contains(write_op))
+    }
+
     /// Execute a CLI command
     pub async fn execute(
         &self,
@@ -86,7 +163,30 @@ impl CliManager {
         working_dir: Option<&Path>,
     ) -> Result<serde_json::Value> {
         let cli_path = self.ensure_cli(None).await?;
-        self.executor.execute(&cli_path, args, working_dir).await
+        let result = self.executor.execute(&cli_path, args, working_dir).await?;
+        
+        // Extract operation information for hooks
+        let (operation, _parameters) = Self::extract_operation_info(args);
+        
+        // Only trigger hooks for write operations
+        if Self::is_write_operation(&operation) {
+            self.trigger_operation_hooks(&operation, args, &result).await;
+        }
+        
+        Ok(result)
+    }
+
+    /// Trigger all registered operation hooks
+    async fn trigger_operation_hooks(
+        &self,
+        operation: &str,
+        args: &[&str],
+        result: &serde_json::Value,
+    ) {
+        let hooks = self.operation_hooks.read().await;
+        for hook in hooks.iter() {
+            hook(operation, args, result);
+        }
     }
 
     /// Execute a CLI command with custom timeout
