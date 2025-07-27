@@ -1,6 +1,6 @@
 {
   "name": "@pulseengine/studio-mcp-server",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "WindRiver Studio MCP Server - A Model Context Protocol server for WindRiver Studio CLI integration",
   "main": "index.js",
   "bin": {
