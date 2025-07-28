@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@pulseengine/studio-mcp-server": "^0.2.5",
+    "binary-install": "^1.1.0"
+  }
+}
