@@ -42,12 +42,10 @@ jobs:
 
 
       - name: Build binary
-        working-directory: studio-mcp-server
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} --package studio-mcp-server
 
       - name: Prepare binary (Unix)
         if: matrix.archive == 'tar.gz'
-        working-directory: studio-mcp-server
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/studio-mcp-server dist/
@@ -56,7 +54,6 @@ jobs:
 
       - name: Prepare binary (Windows)
         if: matrix.archive == 'zip'
-        working-directory: studio-mcp-server
         run: |
           mkdir dist
           cp target/${{ matrix.target }}/release/studio-mcp-server.exe dist/
@@ -67,7 +64,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: studio-mcp-server/dist/studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          file: dist/studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
           asset_name: studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
           tag: ${{ github.event.release.tag_name || github.event.inputs.version }}
           overwrite: true
