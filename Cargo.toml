@@ -31,8 +31,8 @@ base64 = "0.22"
 regex = "1.0"
 
 # MCP dependencies - using PulseEngine MCP implementation
-pulseengine-mcp-server = "0.4.1"
-pulseengine-mcp-protocol = "0.4.1"
+pulseengine-mcp-server = "0.6.0"
+pulseengine-mcp-protocol = "0.6.0"
 async-trait = "0.1"
 
 [profile.release]

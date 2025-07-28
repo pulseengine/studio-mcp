@@ -117,6 +117,7 @@ impl McpBackend for StudioMcpBackend {
                 prompts: None,
                 sampling: None,
                 logging: None,
+                elicitation: None,
             },
             server_info: Implementation {
                 name: "studio-mcp-server".to_string(),
@@ -157,6 +158,7 @@ impl McpBackend for StudioMcpBackend {
         Ok(CallToolResult {
             content,
             is_error: Some(false),
+            structured_content: None,
         })
     }
 

@@ -73,6 +73,45 @@ impl ToolProvider {
                     "properties": {},
                     "required": []
                 }),
+                output_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "version": {"type": "string"},
+                                "status": {"type": "string"},
+                                "uptime": {"type": "string"}
+                            }
+                        },
+                        "cli": {
+                            "type": "object",
+                            "properties": {
+                                "installed_versions": {"type": "array", "items": {"type": "string"}},
+                                "auto_update_enabled": {"type": "boolean"},
+                                "base_url": {"type": "string"},
+                                "timeout": {"type": "number"}
+                            }
+                        },
+                        "connections": {
+                            "type": "object",
+                            "properties": {
+                                "total_configured": {"type": "integer"},
+                                "default_connection": {"type": "string"},
+                                "available_connections": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "cache": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {"type": "boolean"},
+                                "ttl_seconds": {"type": "number"},
+                                "max_size": {"type": "number"}
+                            }
+                        }
+                    }
+                })),
             },
             Tool {
                 name: "studio_version".to_string(),
@@ -82,6 +121,28 @@ impl ToolProvider {
                     "properties": {},
                     "required": []
                 }),
+                output_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "server": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "version": {"type": "string"}
+                            }
+                        },
+                        "cli": {
+                            "type": "object",
+                            "properties": {
+                                "configured_version": {"type": "string"},
+                                "installed_versions": {"type": "array", "items": {"type": "string"}},
+                                "current_version": {"type": "string"},
+                                "version_error": {"type": "string"},
+                                "availability_error": {"type": "string"}
+                            }
+                        }
+                    }
+                })),
             },
             Tool {
                 name: "cli_info".to_string(),
@@ -92,6 +153,40 @@ impl ToolProvider {
                     "properties": {},
                     "required": []
                 }),
+                output_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "installation": {
+                            "type": "object",
+                            "properties": {
+                                "base_url": {"type": "string"},
+                                "install_directory": {"type": "string"},
+                                "auto_update": {"type": "boolean"},
+                                "update_interval_hours": {"type": "number"},
+                                "timeout_seconds": {"type": "number"}
+                            }
+                        },
+                        "versions": {
+                            "type": "object",
+                            "properties": {
+                                "configured": {"type": "string"},
+                                "installed": {"type": "array", "items": {"type": "string"}},
+                                "total_installed": {"type": "integer"}
+                            }
+                        },
+                        "current": {
+                            "type": "object",
+                            "properties": {
+                                "path": {"type": "string"},
+                                "exists": {"type": "boolean"},
+                                "executable": {"type": "boolean"}
+                            }
+                        },
+                        "capabilities": {"type": "string"},
+                        "help_error": {"type": "string"},
+                        "error": {"type": "string"}
+                    }
+                })),
             },
         ]
     }

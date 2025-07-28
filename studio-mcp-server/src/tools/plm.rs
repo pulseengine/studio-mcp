@@ -51,6 +51,27 @@ impl PlmToolProvider {
                     },
                     "required": []
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "pipelines": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "status": {"type": "string"},
+                                    "created_by": {"type": "string"},
+                                    "created_at": {"type": "string"}
+                                }
+                            }
+                        },
+                        "total": {"type": "integer"},
+                        "offset": {"type": "integer"},
+                        "limit": {"type": "integer"}
+                    }
+                })),
             },
             Tool {
                 name: "plm_get_pipeline".to_string(),
@@ -65,6 +86,18 @@ impl PlmToolProvider {
                     },
                     "required": ["pipeline_id"]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "pipeline_id": {"type": "string"},
+                        "format": {"type": "string"},
+                        "data": {"type": "string", "description": "Pipeline definition in YAML/JSON format"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_start_pipeline".to_string(),
@@ -111,6 +144,21 @@ impl PlmToolProvider {
                     },
                     "required": []
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "pipeline": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object", "description": "Pipeline execution result"},
+                        "parameters": {"type": "array"},
+                        "config": {"type": "array"},
+                        "env": {"type": "array"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success", "action"]
+                })),
             },
             Tool {
                 name: "plm_cancel_run".to_string(),
@@ -125,6 +173,18 @@ impl PlmToolProvider {
                     },
                     "required": ["run_id"]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object", "description": "Cancellation result"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success", "run_id", "action"]
+                })),
             },
 
             // ID resolution tool
@@ -153,6 +213,20 @@ impl PlmToolProvider {
                         {"required": ["pipeline_id", "run_number"]}
                     ]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "pipeline": {"type": "string"},
+                        "run_number": {"type": "integer"},
+                        "run_details": {"type": "object"},
+                        "error": {"type": "string"},
+                        "available_runs": {"type": "integer"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
 
             // Pipeline run management tools
@@ -173,6 +247,28 @@ impl PlmToolProvider {
                     },
                     "required": []
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "data": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "pipeline_id": {"type": "string"},
+                                    "status": {"type": "string"},
+                                    "created_at": {"type": "string"}
+                                }
+                            }
+                        },
+                        "pipeline_filter": {"type": "string"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_get_run".to_string(),
@@ -204,6 +300,27 @@ impl PlmToolProvider {
                         {"required": ["pipeline_id", "run_number"]}
                     ]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "pipeline_id": {"type": "string"},
+                                "status": {"type": "string"},
+                                "created_at": {"type": "string"},
+                                "updated_at": {"type": "string"},
+                                "tasks": {"type": "array"}
+                            }
+                        },
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_get_run_log".to_string(),
@@ -256,6 +373,27 @@ impl PlmToolProvider {
                         {"required": ["pipeline_id", "run_number"]}
                     ]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "data": {"type": "string", "description": "Log content"},
+                        "filters_applied": {
+                            "type": "object",
+                            "properties": {
+                                "lines": {"type": "integer"},
+                                "tail": {"type": "boolean"},
+                                "errors_only": {"type": "boolean"},
+                                "task_name": {"type": "string"},
+                                "since": {"type": "string"}
+                            }
+                        },
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_get_pipeline_errors".to_string(),
@@ -280,6 +418,36 @@ impl PlmToolProvider {
                     },
                     "required": []
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "pipeline": {"type": "string"},
+                                "analyzed_runs": {"type": "integer"},
+                                "total_errors": {"type": "integer"},
+                                "error_patterns": {"type": "object"},
+                                "recent_errors": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "run_id": {"type": "string"},
+                                            "error_count": {"type": "integer"},
+                                            "timestamp": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "pipeline": {"type": "string"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_get_task_errors".to_string(),
@@ -304,6 +472,42 @@ impl PlmToolProvider {
                     },
                     "required": ["run_id", "task_name"]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "task_name": {"type": "string"},
+                        "context_lines": {"type": "integer"},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "total_errors": {"type": "integer"},
+                                "error_blocks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "error_line": {"type": "integer"},
+                                            "error_text": {"type": "string"},
+                                            "context": {"type": "string"}
+                                        }
+                                    }
+                                },
+                                "analysis": {
+                                    "type": "object",
+                                    "properties": {
+                                        "common_patterns": {"type": "object"},
+                                        "severity": {"type": "string"}
+                                    }
+                                }
+                            }
+                        },
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
             Tool {
                 name: "plm_get_run_events".to_string(),
@@ -335,6 +539,30 @@ impl PlmToolProvider {
                         {"required": ["pipeline_id", "run_number"]}
                     ]
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "run_id": {"type": "string"},
+                        "data": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "event_id": {"type": "string"},
+                                    "event_type": {"type": "string"},
+                                    "timestamp": {"type": "string"},
+                                    "task_name": {"type": "string"},
+                                    "message": {"type": "string"},
+                                    "data": {"type": "object"}
+                                }
+                            }
+                        },
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
 
             // Resource management tools
@@ -355,6 +583,30 @@ impl PlmToolProvider {
                     },
                     "required": []
                 }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "data": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "type": {"type": "string"},
+                                    "pipeline_id": {"type": "string"},
+                                    "access_config": {"type": "string"},
+                                    "status": {"type": "string"}
+                                }
+                            }
+                        },
+                        "filters": {"type": "object"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
             },
         ];
 
