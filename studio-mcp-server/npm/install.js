@@ -44,11 +44,23 @@ function getDownloadUrl() {
   const platform = getPlatform();
   const binaryName = getBinaryName();
   
+  // Determine archive format based on platform
+  const archiveExtension = os.type() === "Windows_NT" ? "zip" : "tar.gz";
+  
   // Use GitHub releases for binary distribution
-  return `https://github.com/pulseengine/studio-mcp/releases/download/v${version}/studio-mcp-server-v${version}-${platform}.tar.gz`;
+  return `https://github.com/pulseengine/studio-mcp/releases/download/v${version}/studio-mcp-server-v${version}-${platform}.${archiveExtension}`;
 }
 
-const binary = new Binary(getBinaryName(), getDownloadUrl());
+const binaryName = getBinaryName();
+const downloadUrl = getDownloadUrl();
+
+// Debug logging
+console.log(`Platform detected: ${os.type()} ${os.arch()}`);
+console.log(`Target: ${getPlatform()}`);
+console.log(`Binary: ${binaryName}`);
+console.log(`Download URL: ${downloadUrl}`);
+
+const binary = new Binary(binaryName, downloadUrl);
 
 binary.install().catch(err => {
   console.error("Failed to install studio-mcp-server binary:", err.message);
