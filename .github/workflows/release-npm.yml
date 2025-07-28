@@ -65,6 +65,7 @@ jobs:
           Compress-Archive -Path studio-mcp-server.exe -DestinationPath studio-mcp-server-${{ github.event.release.tag_name || github.event.inputs.version }}-${{ matrix.target }}.zip
 
       - name: Upload binary to release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
