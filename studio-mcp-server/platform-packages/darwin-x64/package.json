@@ -1,6 +1,6 @@
 {
   "name": "@pulseengine/studio-mcp-server-darwin-x64",
-  "version": "0.2.7",
+  "version": "0.0.0",
   "description": "Darwin x64 binary for studio-mcp-server",
   "main": "studio-mcp-server",
   "os": ["darwin"],

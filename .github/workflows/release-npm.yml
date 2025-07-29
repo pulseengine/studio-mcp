@@ -101,13 +101,25 @@ jobs:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Update package version
+      - name: Update package version and dependencies
         working-directory: studio-mcp-server/npm
         run: |
           VERSION=${{ github.event.release.tag_name || github.event.inputs.version }}
           # Remove 'v' prefix if present
           VERSION=${VERSION#v}
+          
+          # Update main package version
           npm version $VERSION --no-git-tag-version
+          
+          # Update optionalDependencies to use the same version
+          jq --arg version "$VERSION" '
+            .optionalDependencies = {
+              "@pulseengine/studio-mcp-server-darwin-arm64": $version,
+              "@pulseengine/studio-mcp-server-darwin-x64": $version,
+              "@pulseengine/studio-mcp-server-linux-x64": $version,
+              "@pulseengine/studio-mcp-server-win32-x64": $version
+            }
+          ' package.json > package.json.tmp && mv package.json.tmp package.json
 
       - name: Install dependencies
         working-directory: studio-mcp-server/npm
@@ -193,7 +205,9 @@ jobs:
           VERSION=${{ github.event.release.tag_name || github.event.inputs.version }}
           # Remove 'v' prefix if present
           VERSION=${VERSION#v}
-          npm version $VERSION --no-git-tag-version
+          
+          # Update platform package version
+          jq --arg version "$VERSION" '.version = $version' package.json > package.json.tmp && mv package.json.tmp package.json
 
       - name: Publish platform package
         working-directory: studio-mcp-server/platform-packages/${{ matrix.platform }}
