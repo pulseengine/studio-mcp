@@ -30,10 +30,10 @@
     "url": "https://github.com/pulseengine/studio-mcp/issues"
   },
   "optionalDependencies": {
-    "@pulseengine/studio-mcp-server-darwin-arm64": "0.2.7",
-    "@pulseengine/studio-mcp-server-darwin-x64": "0.2.7",
-    "@pulseengine/studio-mcp-server-linux-x64": "0.2.7",
-    "@pulseengine/studio-mcp-server-win32-x64": "0.2.7"
+    "@pulseengine/studio-mcp-server-darwin-arm64": "0.2.11",
+    "@pulseengine/studio-mcp-server-darwin-x64": "0.2.11",
+    "@pulseengine/studio-mcp-server-linux-x64": "0.2.11",
+    "@pulseengine/studio-mcp-server-win32-x64": "0.2.11"
   },
   "engines": {
     "node": ">=14"
