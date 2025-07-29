@@ -87,9 +87,82 @@ jobs:
           
           gh release upload "${VERSION}" "${FILE}"
 
-  publish-npm:
-    name: Publish to NPM
+  build-platform-packages:
+    name: Build platform packages
     needs: build-binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+          - target: x86_64-apple-darwin
+            platform: darwin
+            arch: x64
+          - target: aarch64-apple-darwin
+            platform: darwin
+            arch: arm64
+          - target: x86_64-pc-windows-msvc
+            platform: win32
+            arch: x64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ github.event.release.tag_name || github.event.inputs.version }}
+          ARCHIVE_EXT=${{ matrix.target == 'x86_64-pc-windows-msvc' && 'zip' || 'tar.gz' }}
+          BINARY_NAME=${{ matrix.target == 'x86_64-pc-windows-msvc' && 'studio-mcp-server.exe' || 'studio-mcp-server' }}
+          FILENAME="studio-mcp-server-${VERSION}-${{ matrix.target }}.${ARCHIVE_EXT}"
+          
+          # Download the binary archive
+          gh release download "${VERSION}" --pattern "${FILENAME}"
+          
+          # Create platform package directory
+          PLATFORM_DIR="studio-mcp-server/platform-packages/${{ matrix.platform }}-${{ matrix.arch }}"
+          mkdir -p "${PLATFORM_DIR}/bin"
+          
+          # Extract binary
+          if [[ "${ARCHIVE_EXT}" == "tar.gz" ]]; then
+            tar -xzf "${FILENAME}" -C "${PLATFORM_DIR}/bin"
+          else
+            unzip "${FILENAME}" -d "${PLATFORM_DIR}/bin"
+          fi
+          
+          # Make binary executable
+          chmod +x "${PLATFORM_DIR}/bin/${BINARY_NAME}"
+
+      - name: Update platform package version
+        run: |
+          VERSION=${{ github.event.release.tag_name || github.event.inputs.version }}
+          VERSION=${VERSION#v}
+          PLATFORM_DIR="studio-mcp-server/platform-packages/${{ matrix.platform }}-${{ matrix.arch }}"
+          
+          # Update package.json version
+          cd "${PLATFORM_DIR}"
+          npm version "${VERSION}" --no-git-tag-version
+
+      - name: Publish platform package
+        run: |
+          PLATFORM_DIR="studio-mcp-server/platform-packages/${{ matrix.platform }}-${{ matrix.arch }}"
+          cd "${PLATFORM_DIR}"
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-npm:
+    name: Publish main NPM package
+    needs: [build-binaries, build-platform-packages]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

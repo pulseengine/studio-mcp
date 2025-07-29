@@ -1,0 +1,15 @@
+{
+  "name": "@pulseengine/studio-mcp-server-darwin-arm64",
+  "version": "0.2.9",
+  "description": "WindRiver Studio MCP Server binary for macOS ARM64",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "main": "index.js",
+  "files": ["bin", "index.js"],
+  "author": "PulseEngine",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pulseengine/studio-mcp.git"
+  }
+}

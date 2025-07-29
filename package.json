@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@pulseengine/studio-mcp-server": "^0.2.5",
+    "@pulseengine/studio-mcp-server": "file:studio-mcp-server/npm/pulseengine-studio-mcp-server-0.2.9.tgz",
     "binary-install": "^1.1.0"
   }
 }
