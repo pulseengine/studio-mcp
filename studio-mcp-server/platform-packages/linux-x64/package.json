@@ -1,0 +1,18 @@
+{
+  "name": "@pulseengine/studio-mcp-server-linux-x64",
+  "version": "0.2.7",
+  "description": "Linux x64 binary for studio-mcp-server",
+  "main": "studio-mcp-server",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "keywords": ["mcp", "model-context-protocol", "studio", "windriver"],
+  "author": "PulseEngine",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pulseengine/studio-mcp.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
