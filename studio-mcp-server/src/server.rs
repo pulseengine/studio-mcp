@@ -1,4 +1,4 @@
-//! Main MCP server implementation using PulseEngine MCP framework
+//! Main MCP server implementation using PulseEngine MCP framework v0.7.0
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -28,7 +28,7 @@ pub struct StudioMcpServer {
 
 impl StudioMcpServer {
     pub async fn new(config: StudioConfig) -> Result<Self> {
-        info!("Initializing Studio MCP Server with PulseEngine framework");
+        info!("Initializing Studio MCP Server with PulseEngine framework v0.7.0");
 
         // Initialize CLI manager
         let cli_manager = Arc::new(CliManager::new(
@@ -78,7 +78,7 @@ impl StudioMcpServer {
             .await
             .map_err(|e| StudioError::Mcp(format!("Failed to create server: {e}")))?;
 
-        info!("Starting PulseEngine MCP server with stdio transport");
+        info!("Starting PulseEngine MCP server v0.7.0 with stdio transport");
 
         server
             .run()
@@ -123,7 +123,7 @@ impl McpBackend for StudioMcpBackend {
                 name: "studio-mcp-server".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
-            instructions: Some("WindRiver Studio MCP Server providing access to Studio CLI functionality, focusing on Pipeline Management (PLM) features.".to_string()),
+            instructions: Some("WindRiver Studio MCP Server v0.7.0 providing access to Studio CLI functionality, focusing on Pipeline Management (PLM) features.".to_string()),
         }
     }
 
