@@ -1,0 +1,45 @@
+{
+  "connections": {
+    "production": {
+      "name": "Production Studio",
+      "url": "https://prod-studio.company.com",
+      "username": "prod-service-account",
+      "auth_method": "keyring"
+    },
+    "staging": {
+      "name": "Staging Studio",
+      "url": "https://staging-studio.company.com",
+      "username": "staging-service-account",
+      "auth_method": "keyring"
+    },
+    "development": {
+      "name": "Development Studio",
+      "url": "https://dev-studio.company.com",
+      "username": "dev-user"
+    }
+  },
+  "cli": {
+    "download_base_url": "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd",
+    "version": "auto",
+    "auto_update": true,
+    "timeout_seconds": 300
+  },
+  "cache": {
+    "enabled": true,
+    "max_memory_mb": 150,
+    "user_isolation": true,
+    "ttl": {
+      "immutable": 7200,
+      "completed": 172800,
+      "semi_dynamic": 900,
+      "dynamic": 60
+    }
+  },
+  "server": {
+    "timeout_seconds": 60,
+    "max_concurrent_requests": 8,
+    "enable_metrics": true,
+    "log_level": "info",
+    "sensitive_data_filter": true
+  }
+}

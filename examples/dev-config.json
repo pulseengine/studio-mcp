@@ -1,0 +1,32 @@
+{
+  "connections": {
+    "development": {
+      "name": "Development Studio",
+      "url": "https://dev-studio.company.com",
+      "username": "dev-user"
+    }
+  },
+  "cli": {
+    "download_base_url": "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd",
+    "version": "auto",
+    "auto_update": true,
+    "timeout_seconds": 180
+  },
+  "cache": {
+    "enabled": true,
+    "max_memory_mb": 50,
+    "ttl": {
+      "immutable": 300,
+      "completed": 3600,
+      "semi_dynamic": 60,
+      "dynamic": 10
+    }
+  },
+  "server": {
+    "timeout_seconds": 30,
+    "max_concurrent_requests": 3,
+    "enable_metrics": true,
+    "log_level": "debug",
+    "sensitive_data_filter": true
+  }
+}

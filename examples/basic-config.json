@@ -1,0 +1,14 @@
+{
+  "connections": {
+    "default": {
+      "name": "My Studio",
+      "url": "https://your-studio-instance.com",
+      "username": "your-username"
+    }
+  },
+  "cli": {
+    "download_base_url": "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd",
+    "version": "auto",
+    "auto_update": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "connections": {
+    "production": {
+      "name": "Production Studio",
+      "url": "https://studio.company.com",
+      "username": "service-account",
+      "auth_method": "keyring"
+    }
+  },
+  "cli": {
+    "download_base_url": "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd",
+    "version": "auto",
+    "auto_update": false,
+    "timeout_seconds": 300,
+    "retry_attempts": 3
+  },
+  "cache": {
+    "enabled": true,
+    "max_memory_mb": 200,
+    "memory_eviction_threshold": 0.85,
+    "ttl": {
+      "immutable": 86400,
+      "completed": 604800,
+      "semi_dynamic": 1800,
+      "dynamic": 120
+    }
+  },
+  "server": {
+    "timeout_seconds": 45,
+    "max_concurrent_requests": 5,
+    "enable_metrics": true,
+    "log_level": "info",
+    "sensitive_data_filter": true
+  }
+}
