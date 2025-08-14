@@ -3,8 +3,9 @@
 use pulseengine_mcp_protocol::{Content, Tool};
 use serde_json::{json, Value};
 use std::sync::Arc;
+use std::time::Duration;
 use studio_cli_manager::CliManager;
-use studio_mcp_shared::{Result, StudioConfig, StudioError};
+use studio_mcp_shared::{OperationType, Result, StudioConfig, StudioError};
 use tracing::{debug, error};
 
 pub struct PlmToolProvider {
@@ -34,14 +35,53 @@ impl PlmToolProvider {
                             "type": "string",
                             "description": "Filter by pipeline name"
                         },
-                        "user": {
+                        "pipeline_id": {
+                            "type": "string",
+                            "description": "Filter by specific pipeline ID"
+                        },
+                        "created_by": {
                             "type": "string",
                             "description": "Filter by user who created the pipeline"
+                        },
+                        "modified_by": {
+                            "type": "string",
+                            "description": "Filter by user who last modified the pipeline"
+                        },
+                        "include_tasks": {
+                            "type": "boolean",
+                            "description": "Include task definitions in pipeline list"
+                        },
+                        "is_archived": {
+                            "type": "boolean",
+                            "description": "Show/hide archived pipelines"
+                        },
+                        "is_template": {
+                            "type": "boolean",
+                            "description": "Show/hide pipeline templates"
+                        },
+                        "sort_column": {
+                            "type": "string",
+                            "description": "Column to sort by (name, created_at, modified_by, etc.)"
+                        },
+                        "sort_direction": {
+                            "type": "string",
+                            "description": "Sort direction",
+                            "enum": ["ASC", "DESC", "ascending", "descending"]
                         },
                         "limit": {
                             "type": "integer",
                             "description": "Limit number of results (default 10, 0 for all)",
                             "minimum": 0
+                        },
+                        "page_size": {
+                            "type": "integer",
+                            "description": "Page size for pagination (alternative to limit)",
+                            "minimum": 1
+                        },
+                        "page_number": {
+                            "type": "integer",
+                            "description": "Page number for pagination",
+                            "minimum": 1
                         },
                         "offset": {
                             "type": "integer",
@@ -101,17 +141,17 @@ impl PlmToolProvider {
             },
             Tool {
                 name: "plm_start_pipeline".to_string(),
-                description: "Start execution of a pipeline with optional parameters".to_string(),
+                description: "Start execution of a pipeline with optional parameters. Either pipeline_name or pipeline_id is required.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "pipeline_name": {
                             "type": "string",
-                            "description": "Name of the pipeline to run"
+                            "description": "Name of the pipeline to run (mutually exclusive with pipeline_id)"
                         },
                         "pipeline_id": {
                             "type": "string",
-                            "description": "ID of the pipeline to run (alternative to name)"
+                            "description": "ID of the pipeline to run (mutually exclusive with pipeline_name)"
                         },
                         "parameters": {
                             "type": "array",
@@ -139,10 +179,13 @@ impl PlmToolProvider {
                         },
                         "follow": {
                             "type": "boolean",
-                            "description": "Stream logs until completion"
+                            "description": "Stream logs until completion (uses extended timeout)"
                         }
                     },
-                    "required": []
+                    "anyOf": [
+                        {"required": ["pipeline_name"]},
+                        {"required": ["pipeline_id"]}
+                    ]
                 }),
                 output_schema: Some(json!({
                     "type": "object",
@@ -232,7 +275,7 @@ impl PlmToolProvider {
             // Pipeline run management tools
             Tool {
                 name: "plm_list_runs".to_string(),
-                description: "List pipeline runs, optionally filtered by pipeline".to_string(),
+                description: "List pipeline runs with comprehensive filtering options".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -243,6 +286,54 @@ impl PlmToolProvider {
                         "pipeline_id": {
                             "type": "string",
                             "description": "Filter runs by pipeline ID"
+                        },
+                        "run_number": {
+                            "type": "integer",
+                            "description": "Filter by specific run number",
+                            "minimum": 1
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Filter by run status (running, completed, failed, etc.)"
+                        },
+                        "created_by": {
+                            "type": "string",
+                            "description": "Filter by user who created the run"
+                        },
+                        "start_time": {
+                            "type": "string",
+                            "description": "Filter runs started after this timestamp (ISO 8601 format)"
+                        },
+                        "end_time": {
+                            "type": "string",
+                            "description": "Filter runs started before this timestamp (ISO 8601 format)"
+                        },
+                        "from_failure": {
+                            "type": "boolean",
+                            "description": "Show runs from failure point"
+                        },
+                        "compile_only": {
+                            "type": "boolean",
+                            "description": "Show only compile-only runs"
+                        },
+                        "sort_column": {
+                            "type": "string",
+                            "description": "Column to sort by (start_time, status, pipeline_name, etc.)"
+                        },
+                        "sort_direction": {
+                            "type": "string",
+                            "description": "Sort direction",
+                            "enum": ["ASC", "DESC", "ascending", "descending"]
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Limit number of results",
+                            "minimum": 1
+                        },
+                        "offset": {
+                            "type": "integer",
+                            "description": "Starting offset for results",
+                            "minimum": 0
                         }
                     },
                     "required": []
@@ -292,6 +383,22 @@ impl PlmToolProvider {
                             "type": "integer",
                             "description": "Run number within the pipeline (1 = latest, 2 = second latest, etc.)",
                             "minimum": 1
+                        },
+                        "run_config": {
+                            "type": "boolean",
+                            "description": "Include run configuration details"
+                        },
+                        "detailed_info": {
+                            "type": "boolean",
+                            "description": "Include detailed run information"
+                        },
+                        "include_tasks": {
+                            "type": "boolean",
+                            "description": "Include task definitions and details"
+                        },
+                        "execution_logs": {
+                            "type": "boolean",
+                            "description": "Include execution logs in the response"
                         }
                     },
                     "anyOf": [
@@ -365,6 +472,26 @@ impl PlmToolProvider {
                         "since": {
                             "type": "string",
                             "description": "Show logs since timestamp (ISO format)"
+                        },
+                        "query_since": {
+                            "type": "string", 
+                            "description": "Query logs since timestamp (more precise than since)"
+                        },
+                        "query_until": {
+                            "type": "string",
+                            "description": "Query logs until timestamp"
+                        },
+                        "log_type": {
+                            "type": "string",
+                            "description": "Filter by log type (error, warning, info, debug)"
+                        },
+                        "sort_column": {
+                            "type": "string",
+                            "description": "Sort logs by column (timestamp, level, task, etc.)"
+                        },
+                        "raw_field": {
+                            "type": "boolean",
+                            "description": "Return raw log fields without formatting"
                         }
                     },
                     "anyOf": [
@@ -608,6 +735,434 @@ impl PlmToolProvider {
                     "required": ["success"]
                 })),
             },
+
+            // Task management tools
+            Tool {
+                name: "plm_create_task".to_string(),
+                description: "Create a new task from YAML/JSON definition or parameters".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "task_definition": {
+                            "type": "string",
+                            "description": "Task definition in YAML or JSON format"
+                        },
+                        "definition_file": {
+                            "type": "string", 
+                            "description": "Path to YAML/JSON file containing task definition"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the task (alternative to task_definition)"
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Task category (required with name)"
+                        },
+                        "task_lib": {
+                            "type": "string",
+                            "description": "Task library (required with name)"
+                        },
+                        "version": {
+                            "type": "string",
+                            "description": "Task version (optional)"
+                        }
+                    },
+                    "anyOf": [
+                        {"required": ["task_definition"]},
+                        {"required": ["definition_file"]},
+                        {"required": ["name", "category", "task_lib"]}
+                    ]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "task_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_update_task".to_string(),
+                description: "Update an existing task with new definition".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "task_name": {
+                            "type": "string",
+                            "description": "Name of the task to update"
+                        },
+                        "task_definition": {
+                            "type": "string",
+                            "description": "Updated task definition in YAML or JSON format"
+                        },
+                        "definition_file": {
+                            "type": "string",
+                            "description": "Path to YAML/JSON file containing updated task definition"
+                        }
+                    },
+                    "required": ["task_name"],
+                    "anyOf": [
+                        {"required": ["task_name", "task_definition"]},
+                        {"required": ["task_name", "definition_file"]}
+                    ]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "task_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_delete_task".to_string(),
+                description: "Delete a task by name".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "task_name": {
+                            "type": "string",
+                            "description": "Name of the task to delete"
+                        }
+                    },
+                    "required": ["task_name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "task_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_rename_task".to_string(),
+                description: "Rename a task from old name to new name".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "old_task_name": {
+                            "type": "string",
+                            "description": "Current name of the task"
+                        },
+                        "new_task_name": {
+                            "type": "string",
+                            "description": "New name for the task"
+                        }
+                    },
+                    "required": ["old_task_name", "new_task_name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "old_task_name": {"type": "string"},
+                        "new_task_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_list_tasks".to_string(),
+                description: "List all available tasks with optional filtering".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "Filter tasks by category"
+                        },
+                        "task_lib": {
+                            "type": "string",
+                            "description": "Filter tasks by task library"
+                        },
+                        "include_tasks": {
+                            "type": "boolean",
+                            "description": "Include detailed task definitions"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Limit number of results",
+                            "minimum": 1
+                        },
+                        "offset": {
+                            "type": "integer",
+                            "description": "Starting offset for results",
+                            "minimum": 0
+                        }
+                    },
+                    "required": []
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "data": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "category": {"type": "string"},
+                                    "task_lib": {"type": "string"},
+                                    "version": {"type": "string"},
+                                    "definition": {"type": "object"}
+                                }
+                            }
+                        },
+                        "filters": {"type": "object"},
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_get_task".to_string(),
+                description: "Get detailed information about a specific task".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "task_name": {
+                            "type": "string",
+                            "description": "Name of the task to retrieve"
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Task category (alternative identifier)"
+                        },
+                        "version": {
+                            "type": "string",
+                            "description": "Specific version to retrieve"
+                        }
+                    },
+                    "anyOf": [
+                        {"required": ["task_name"]},
+                        {"required": ["category", "task_name"]}
+                    ]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "task_name": {"type": "string"},
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "category": {"type": "string"},
+                                "task_lib": {"type": "string"},
+                                "version": {"type": "string"},
+                                "definition": {"type": "object"},
+                                "dependencies": {"type": "array"}
+                            }
+                        },
+                        "error": {"type": "string"},
+                        "message": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_unlock_task".to_string(),
+                description: "Unlock a task that may be locked by another process".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "task_name": {
+                            "type": "string",
+                            "description": "Name of the task to unlock"
+                        }
+                    },
+                    "required": ["task_name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "task_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_rename_param".to_string(),
+                description: "Rename a pipeline parameter by specifying the old name and new name".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "pipeline_name": {
+                            "type": "string",
+                            "description": "Name of the pipeline containing the parameter to rename"
+                        },
+                        "old_param_name": {
+                            "type": "string",
+                            "description": "Current name of the parameter to rename"
+                        },
+                        "new_param_name": {
+                            "type": "string",
+                            "description": "New name for the parameter"
+                        },
+                        "file": {
+                            "type": "string",
+                            "description": "Path to pipeline YAML/JSON file (alternative to pipeline name)"
+                        }
+                    },
+                    "anyOf": [
+                        {"required": ["pipeline_name", "old_param_name", "new_param_name"]},
+                        {"required": ["file", "old_param_name", "new_param_name"]}
+                    ]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "pipeline_name": {"type": "string"},
+                        "old_param_name": {"type": "string"},
+                        "new_param_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_create_access_config".to_string(),
+                description: "Create a new pipeline access configuration with optional user credentials".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the access configuration"
+                        },
+                        "username": {
+                            "type": "string",
+                            "description": "Username of access user (optional, creates bot if not provided)"
+                        },
+                        "password": {
+                            "type": "string",
+                            "description": "Password of access user (optional)"
+                        },
+                        "group": {
+                            "type": "string",
+                            "description": "Group name or ID for the access config"
+                        },
+                        "create_ssh": {
+                            "type": "boolean",
+                            "description": "Enable SSH key creation (default: true)",
+                            "default": true
+                        }
+                    },
+                    "required": ["name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_list_access_configs".to_string(),
+                description: "List all pipeline access configurations".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "data": {"type": "array"},
+                        "total": {"type": "number"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_get_access_config".to_string(),
+                description: "Get detailed information about a specific access configuration".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the access configuration"
+                        }
+                    },
+                    "required": ["name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "name": {"type": "string"},
+                        "data": {"type": "object"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
+            Tool {
+                name: "plm_delete_access_config".to_string(),
+                description: "Delete a pipeline access configuration".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the access configuration to delete"
+                        }
+                    },
+                    "required": ["name"]
+                }),
+                output_schema: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "data": {"type": "object"},
+                        "message": {"type": "string"},
+                        "error": {"type": "string"}
+                    },
+                    "required": ["success"]
+                })),
+            },
         ];
 
         debug!("PLM provider listed {} tools", tools.len());
@@ -635,6 +1190,18 @@ impl PlmToolProvider {
             "plm_list_resources" => self.list_resources(args).await,
             "plm_get_pipeline_errors" => self.get_pipeline_errors(args).await,
             "plm_get_task_errors" => self.get_task_errors(args).await,
+            "plm_create_task" => self.create_task(args).await,
+            "plm_update_task" => self.update_task(args).await,
+            "plm_delete_task" => self.delete_task(args).await,
+            "plm_rename_task" => self.rename_task(args).await,
+            "plm_list_tasks" => self.list_tasks(args).await,
+            "plm_get_task" => self.get_task(args).await,
+            "plm_unlock_task" => self.unlock_task(args).await,
+            "plm_rename_param" => self.rename_param(args).await,
+            "plm_create_access_config" => self.create_access_config(args).await,
+            "plm_list_access_configs" => self.list_access_configs(args).await,
+            "plm_get_access_config" => self.get_access_config(args).await,
+            "plm_delete_access_config" => self.delete_access_config(args).await,
             _ => {
                 error!("Unknown PLM tool: {}", name);
                 Err(StudioError::InvalidOperation(format!(
@@ -648,29 +1215,83 @@ impl PlmToolProvider {
         let mut cli_args = vec!["plm", "pipeline", "list", "--output", "json"];
 
         // Add optional filters
-        let mut name_filter = None;
-        let mut user_filter = None;
-        let limit_str;
-        let offset_str;
+        let mut filters = json!({});
 
         if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
             cli_args.extend_from_slice(&["--name", name]);
-            name_filter = Some(name);
+            filters["name"] = json!(name);
         }
 
-        if let Some(user) = args.get("user").and_then(|v| v.as_str()) {
-            cli_args.extend_from_slice(&["--user", user]);
-            user_filter = Some(user);
+        if let Some(pipeline_id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--id", pipeline_id]);
+            filters["pipeline_id"] = json!(pipeline_id);
         }
 
-        if let Some(limit) = args.get("limit").and_then(|v| v.as_u64()) {
+        if let Some(created_by) = args.get("created_by").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--created-by", created_by]);
+            filters["created_by"] = json!(created_by);
+        }
+
+        if let Some(modified_by) = args.get("modified_by").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--modified-by", modified_by]);
+            filters["modified_by"] = json!(modified_by);
+        }
+
+        if let Some(include_tasks) = args.get("include_tasks").and_then(|v| v.as_bool()) {
+            if include_tasks {
+                cli_args.push("--include-tasks");
+            }
+            filters["include_tasks"] = json!(include_tasks);
+        }
+
+        if let Some(is_archived) = args.get("is_archived").and_then(|v| v.as_bool()) {
+            if is_archived {
+                cli_args.push("--is-archived");
+            }
+            filters["is_archived"] = json!(is_archived);
+        }
+
+        if let Some(is_template) = args.get("is_template").and_then(|v| v.as_bool()) {
+            if is_template {
+                cli_args.push("--is-template");
+            }
+            filters["is_template"] = json!(is_template);
+        }
+
+        if let Some(sort_column) = args.get("sort_column").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--sort-column", sort_column]);
+            filters["sort_column"] = json!(sort_column);
+        }
+
+        if let Some(sort_direction) = args.get("sort_direction").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--sort-direction", sort_direction]);
+            filters["sort_direction"] = json!(sort_direction);
+        }
+
+        // Handle pagination - prefer page_size/page_number over limit/offset
+        let page_size_str;
+        let limit_str;
+        let page_number_str;
+        let offset_str;
+
+        if let Some(page_size) = args.get("page_size").and_then(|v| v.as_u64()) {
+            page_size_str = page_size.to_string();
+            cli_args.extend_from_slice(&["--page-size", &page_size_str]);
+            filters["page_size"] = json!(page_size);
+        } else if let Some(limit) = args.get("limit").and_then(|v| v.as_u64()) {
             limit_str = limit.to_string();
             cli_args.extend_from_slice(&["--limit", &limit_str]);
+            filters["limit"] = json!(limit);
         }
 
-        if let Some(offset) = args.get("offset").and_then(|v| v.as_u64()) {
+        if let Some(page_number) = args.get("page_number").and_then(|v| v.as_u64()) {
+            page_number_str = page_number.to_string();
+            cli_args.extend_from_slice(&["--page-number", &page_number_str]);
+            filters["page_number"] = json!(page_number);
+        } else if let Some(offset) = args.get("offset").and_then(|v| v.as_u64()) {
             offset_str = offset.to_string();
             cli_args.extend_from_slice(&["--offset", &offset_str]);
+            filters["offset"] = json!(offset);
         }
 
         match self.cli_manager.execute(&cli_args, None).await {
@@ -678,12 +1299,7 @@ impl PlmToolProvider {
                 let response = json!({
                     "success": true,
                     "data": result,
-                    "filters": {
-                        "name": name_filter,
-                        "user": user_filter,
-                        "limit": args.get("limit"),
-                        "offset": args.get("offset")
-                    }
+                    "filters": filters
                 });
 
                 Ok(vec![Content::Text {
@@ -792,15 +1408,37 @@ impl PlmToolProvider {
         }
 
         // Add follow flag if requested
-        if args
+        let is_follow = args
             .get("follow")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+
+        if is_follow {
             cli_args.push("--follow");
         }
 
-        match self.cli_manager.execute(&cli_args, None).await {
+        // Use appropriate timeout based on operation type
+        let timeout_duration = if is_follow {
+            Duration::from_secs(
+                self.config
+                    .cli
+                    .timeouts
+                    .get_timeout(OperationType::PipelineFollow),
+            )
+        } else {
+            Duration::from_secs(
+                self.config
+                    .cli
+                    .timeouts
+                    .get_timeout(OperationType::PipelineStart),
+            )
+        };
+
+        match self
+            .cli_manager
+            .execute_with_timeout(&cli_args, None, timeout_duration)
+            .await
+        {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -876,24 +1514,94 @@ impl PlmToolProvider {
     async fn list_runs(&self, args: Value) -> Result<Vec<Content>> {
         let mut cli_args = vec!["plm", "run", "list", "--output", "json"];
 
-        // Add pipeline filter if provided
-        let pipeline_filter = if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str())
-        {
-            cli_args.extend_from_slice(&["--pipeline", name]);
-            Some(format!("name: {name}"))
+        // Add comprehensive filters
+        let mut filters = json!({});
+
+        // Pipeline filters
+        if let Some(name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--pipeline-name", name]);
+            filters["pipeline_name"] = json!(name);
         } else if let Some(id) = args.get("pipeline_id").and_then(|v| v.as_str()) {
-            cli_args.extend_from_slice(&["--pipeline", id]);
-            Some(format!("id: {id}"))
-        } else {
-            None
-        };
+            cli_args.extend_from_slice(&["--pipeline-id", id]);
+            filters["pipeline_id"] = json!(id);
+        }
+
+        // Run-specific filters
+        let run_number_str;
+        if let Some(run_number) = args.get("run_number").and_then(|v| v.as_u64()) {
+            run_number_str = run_number.to_string();
+            cli_args.extend_from_slice(&["--run-number", &run_number_str]);
+            filters["run_number"] = json!(run_number);
+        }
+
+        if let Some(status) = args.get("status").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--status", status]);
+            filters["status"] = json!(status);
+        }
+
+        if let Some(created_by) = args.get("created_by").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--created-by", created_by]);
+            filters["created_by"] = json!(created_by);
+        }
+
+        // Time-based filters
+        if let Some(start_time) = args.get("start_time").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--start-time", start_time]);
+            filters["start_time"] = json!(start_time);
+        }
+
+        if let Some(end_time) = args.get("end_time").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--end-time", end_time]);
+            filters["end_time"] = json!(end_time);
+        }
+
+        // Boolean flags
+        if let Some(from_failure) = args.get("from_failure").and_then(|v| v.as_bool()) {
+            if from_failure {
+                cli_args.push("--from-failure");
+            }
+            filters["from_failure"] = json!(from_failure);
+        }
+
+        if let Some(compile_only) = args.get("compile_only").and_then(|v| v.as_bool()) {
+            if compile_only {
+                cli_args.push("--compile-only");
+            }
+            filters["compile_only"] = json!(compile_only);
+        }
+
+        // Sorting and pagination
+        if let Some(sort_column) = args.get("sort_column").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--sort-column", sort_column]);
+            filters["sort_column"] = json!(sort_column);
+        }
+
+        if let Some(sort_direction) = args.get("sort_direction").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--sort-direction", sort_direction]);
+            filters["sort_direction"] = json!(sort_direction);
+        }
+
+        let limit_str;
+        let offset_str;
+
+        if let Some(limit) = args.get("limit").and_then(|v| v.as_u64()) {
+            limit_str = limit.to_string();
+            cli_args.extend_from_slice(&["--limit", &limit_str]);
+            filters["limit"] = json!(limit);
+        }
+
+        if let Some(offset) = args.get("offset").and_then(|v| v.as_u64()) {
+            offset_str = offset.to_string();
+            cli_args.extend_from_slice(&["--offset", &offset_str]);
+            filters["offset"] = json!(offset);
+        }
 
         match self.cli_manager.execute(&cli_args, None).await {
             Ok(result) => {
                 let response = json!({
                     "success": true,
                     "data": result,
-                    "pipeline_filter": pipeline_filter
+                    "filters": filters
                 });
 
                 Ok(vec![Content::Text {
@@ -918,11 +1626,34 @@ impl PlmToolProvider {
     async fn get_run(&self, args: Value) -> Result<Vec<Content>> {
         let run_id = self.resolve_run_id_from_args(&args).await?;
 
-        match self
-            .cli_manager
-            .execute(&["plm", "run", "get", &run_id, "--output", "json"], None)
-            .await
-        {
+        let mut cli_args = vec!["plm", "run", "get", &run_id, "--output", "json"];
+
+        // Add additional options based on parameters
+        if let Some(run_config) = args.get("run_config").and_then(|v| v.as_bool()) {
+            if run_config {
+                cli_args.push("--run-config");
+            }
+        }
+
+        if let Some(detailed_info) = args.get("detailed_info").and_then(|v| v.as_bool()) {
+            if detailed_info {
+                cli_args.push("--detailed-info");
+            }
+        }
+
+        if let Some(include_tasks) = args.get("include_tasks").and_then(|v| v.as_bool()) {
+            if include_tasks {
+                cli_args.push("--include-tasks");
+            }
+        }
+
+        if let Some(execution_logs) = args.get("execution_logs").and_then(|v| v.as_bool()) {
+            if execution_logs {
+                cli_args.push("--execution-logs");
+            }
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
             Ok(result) => {
                 let response = json!({
                     "success": true,
@@ -975,6 +1706,34 @@ impl PlmToolProvider {
         if let Some(since) = args.get("since").and_then(|v| v.as_str()) {
             additional_args.push("--since".to_string());
             additional_args.push(since.to_string());
+        }
+
+        if let Some(query_since) = args.get("query_since").and_then(|v| v.as_str()) {
+            additional_args.push("--query-since".to_string());
+            additional_args.push(query_since.to_string());
+        }
+
+        if let Some(query_until) = args.get("query_until").and_then(|v| v.as_str()) {
+            additional_args.push("--query-until".to_string());
+            additional_args.push(query_until.to_string());
+        }
+
+        if let Some(log_type) = args.get("log_type").and_then(|v| v.as_str()) {
+            additional_args.push("--log-type".to_string());
+            additional_args.push(log_type.to_string());
+        }
+
+        if let Some(sort_column) = args.get("sort_column").and_then(|v| v.as_str()) {
+            additional_args.push("--sort-column".to_string());
+            additional_args.push(sort_column.to_string());
+        }
+
+        if args
+            .get("raw_field")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            additional_args.push("--raw-field".to_string());
         }
 
         // Add additional args as string references
@@ -1530,6 +2289,557 @@ impl PlmToolProvider {
             Err(StudioError::InvalidOperation(
                 "Invalid response format from CLI".to_string(),
             ))
+        }
+    }
+
+    // Task management methods
+    async fn create_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "create", "--output", "json"];
+
+        // Determine input method
+        if let Some(task_definition) = args.get("task_definition").and_then(|v| v.as_str()) {
+            // Create task from inline definition
+            cli_args.extend_from_slice(&["--definition", task_definition]);
+        } else if let Some(definition_file) = args.get("definition_file").and_then(|v| v.as_str()) {
+            // Create task from file
+            cli_args.extend_from_slice(&["--file", definition_file]);
+        } else {
+            // Create task from parameters
+            if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--name", name]);
+            }
+            if let Some(category) = args.get("category").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--category", category]);
+            }
+            if let Some(task_lib) = args.get("task_lib").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--task-lib", task_lib]);
+            }
+            if let Some(version) = args.get("version").and_then(|v| v.as_str()) {
+                cli_args.extend_from_slice(&["--version", version]);
+            }
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "created",
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to create task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "error": e.to_string(),
+                    "message": "Failed to create task"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn update_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "update", "--output", "json"];
+
+        // Task name is required
+        if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--name", task_name]);
+        }
+
+        // Add definition source
+        if let Some(task_definition) = args.get("task_definition").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--definition", task_definition]);
+        } else if let Some(definition_file) = args.get("definition_file").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--file", definition_file]);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "updated",
+                    "task_name": args.get("task_name"),
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to update task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "task_name": args.get("task_name"),
+                    "error": e.to_string(),
+                    "message": "Failed to update task"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn delete_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "delete", "--output", "json"];
+
+        if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--name", task_name]);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "deleted",
+                    "task_name": args.get("task_name"),
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to delete task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "task_name": args.get("task_name"),
+                    "error": e.to_string(),
+                    "message": "Failed to delete task"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn rename_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "rename", "--output", "json"];
+
+        if let Some(old_name) = args.get("old_task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--old-task-name", old_name]);
+        }
+
+        if let Some(new_name) = args.get("new_task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--new-task-name", new_name]);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "renamed",
+                    "old_task_name": args.get("old_task_name"),
+                    "new_task_name": args.get("new_task_name"),
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to rename task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "old_task_name": args.get("old_task_name"),
+                    "new_task_name": args.get("new_task_name"),
+                    "error": e.to_string(),
+                    "message": "Failed to rename task"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn list_tasks(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "list", "--output", "json"];
+
+        let mut filters = json!({});
+
+        if let Some(category) = args.get("category").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--category", category]);
+            filters["category"] = json!(category);
+        }
+
+        if let Some(task_lib) = args.get("task_lib").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--task-lib", task_lib]);
+            filters["task_lib"] = json!(task_lib);
+        }
+
+        if let Some(include_tasks) = args.get("include_tasks").and_then(|v| v.as_bool()) {
+            if include_tasks {
+                cli_args.push("--include-tasks");
+            }
+            filters["include_tasks"] = json!(include_tasks);
+        }
+
+        let limit_str;
+        let offset_str;
+
+        if let Some(limit) = args.get("limit").and_then(|v| v.as_u64()) {
+            limit_str = limit.to_string();
+            cli_args.extend_from_slice(&["--limit", &limit_str]);
+            filters["limit"] = json!(limit);
+        }
+
+        if let Some(offset) = args.get("offset").and_then(|v| v.as_u64()) {
+            offset_str = offset.to_string();
+            cli_args.extend_from_slice(&["--offset", &offset_str]);
+            filters["offset"] = json!(offset);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "data": result,
+                    "filters": filters
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to list tasks: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "error": e.to_string(),
+                    "message": "Failed to list tasks"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn get_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "get", "--output", "json"];
+
+        if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--name", task_name]);
+        }
+
+        if let Some(category) = args.get("category").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--category", category]);
+        }
+
+        if let Some(version) = args.get("version").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--version", version]);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "task_name": args.get("task_name"),
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to get task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "task_name": args.get("task_name"),
+                    "error": e.to_string(),
+                    "message": "Failed to retrieve task information"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn unlock_task(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "task", "unlock", "--output", "json"];
+
+        if let Some(task_name) = args.get("task_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--name", task_name]);
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "unlocked",
+                    "task_name": args.get("task_name"),
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to unlock task: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "task_name": args.get("task_name"),
+                    "error": e.to_string(),
+                    "message": "Failed to unlock task"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn rename_param(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "pipeline", "rename-param", "--output", "json"];
+
+        let old_param_name = args
+            .get("old_param_name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("old_param_name is required".to_string()))?;
+
+        let new_param_name = args
+            .get("new_param_name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("new_param_name is required".to_string()))?;
+
+        cli_args.extend_from_slice(&["--old-param-name", old_param_name]);
+        cli_args.extend_from_slice(&["--new-param-name", new_param_name]);
+
+        // Either pipeline name or file is required (validated by anyOf schema)
+        if let Some(pipeline_name) = args.get("pipeline_name").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--name", pipeline_name]);
+        } else if let Some(file) = args.get("file").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--file", file]);
+        } else {
+            return Err(StudioError::InvalidOperation(
+                "Either pipeline_name or file is required".to_string(),
+            ));
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "renamed_parameter",
+                    "pipeline_name": args.get("pipeline_name"),
+                    "old_param_name": old_param_name,
+                    "new_param_name": new_param_name,
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to rename parameter: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "pipeline_name": args.get("pipeline_name"),
+                    "old_param_name": old_param_name,
+                    "new_param_name": new_param_name,
+                    "error": e.to_string(),
+                    "message": "Failed to rename pipeline parameter"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn create_access_config(&self, args: Value) -> Result<Vec<Content>> {
+        let mut cli_args = vec!["plm", "access-config", "create", "--output", "json"];
+
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("name is required".to_string()))?;
+
+        cli_args.extend_from_slice(&["--name", name]);
+
+        if let Some(username) = args.get("username").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--username", username]);
+        }
+
+        if let Some(password) = args.get("password").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--password", password]);
+        }
+
+        if let Some(group) = args.get("group").and_then(|v| v.as_str()) {
+            cli_args.extend_from_slice(&["--group", group]);
+        }
+
+        // Handle create_ssh flag (default is true)
+        let create_ssh = args.get("create_ssh").and_then(|v| v.as_bool()).unwrap_or(true);
+        if !create_ssh {
+            cli_args.push("--create-ssh=false");
+        }
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "created",
+                    "name": name,
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to create access config: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "name": name,
+                    "error": e.to_string(),
+                    "message": "Failed to create access configuration"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn list_access_configs(&self, _args: Value) -> Result<Vec<Content>> {
+        let cli_args = vec!["plm", "access-config", "list", "--output", "json"];
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let configs = if let Some(array) = result.as_array() {
+                    array.clone()
+                } else if let Some(obj) = result.as_object() {
+                    if let Some(configs) = obj.get("access_configs").and_then(|v| v.as_array()) {
+                        configs.clone()
+                    } else {
+                        vec![result]
+                    }
+                } else {
+                    vec![]
+                };
+
+                let response = json!({
+                    "success": true,
+                    "data": configs,
+                    "total": configs.len()
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to list access configs: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "error": e.to_string(),
+                    "message": "Failed to list access configurations"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn get_access_config(&self, args: Value) -> Result<Vec<Content>> {
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("name is required".to_string()))?;
+
+        let cli_args = vec!["plm", "access-config", "get", name, "--output", "json"];
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "name": name,
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to get access config: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "name": name,
+                    "error": e.to_string(),
+                    "message": "Failed to get access configuration"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
+        }
+    }
+
+    async fn delete_access_config(&self, args: Value) -> Result<Vec<Content>> {
+        let name = args
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| StudioError::InvalidOperation("name is required".to_string()))?;
+
+        let cli_args = vec!["plm", "access-config", "delete", name, "--output", "json"];
+
+        match self.cli_manager.execute(&cli_args, None).await {
+            Ok(result) => {
+                let response = json!({
+                    "success": true,
+                    "action": "deleted",
+                    "name": name,
+                    "data": result
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&response)?,
+                }])
+            }
+            Err(e) => {
+                error!("Failed to delete access config: {}", e);
+                let error_response = json!({
+                    "success": false,
+                    "name": name,
+                    "error": e.to_string(),
+                    "message": "Failed to delete access configuration"
+                });
+
+                Ok(vec![Content::Text {
+                    text: serde_json::to_string_pretty(&error_response)?,
+                }])
+            }
         }
     }
 }

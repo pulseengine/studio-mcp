@@ -60,6 +60,12 @@ pub struct TimeoutConfig {
     /// Long operations like logs, streaming (seconds)
     pub long_operations: u64,
 
+    /// Pipeline execution start operations (seconds)
+    pub pipeline_start: u64,
+
+    /// Pipeline execution follow/streaming operations (seconds)
+    pub pipeline_follow: u64,
+
     /// Network requests (seconds)
     pub network_requests: u64,
 }
@@ -114,6 +120,8 @@ impl Default for TimeoutConfig {
             quick_operations: 30,   // 30 seconds for list, get operations
             medium_operations: 300, // 5 minutes for run, cancel operations
             long_operations: 600,   // 10 minutes for logs, streaming operations
+            pipeline_start: 1800,   // 30 minutes for pipeline start operations
+            pipeline_follow: 7200,  // 2 hours for pipeline follow/streaming
             network_requests: 30,   // 30 seconds for HTTP requests
         }
     }
@@ -128,6 +136,10 @@ pub enum OperationType {
     Medium,
     /// Long operations like logs, streaming
     Long,
+    /// Pipeline start operations
+    PipelineStart,
+    /// Pipeline follow/streaming operations
+    PipelineFollow,
     /// Network requests
     Network,
 }
@@ -139,6 +151,8 @@ impl TimeoutConfig {
             OperationType::Quick => self.quick_operations,
             OperationType::Medium => self.medium_operations,
             OperationType::Long => self.long_operations,
+            OperationType::PipelineStart => self.pipeline_start,
+            OperationType::PipelineFollow => self.pipeline_follow,
             OperationType::Network => self.network_requests,
         }
     }

@@ -132,7 +132,7 @@ impl VersionManager {
         // These would normally come from a manifest file
         match (version, platform) {
             ("24.3.0", "linux") => "84a03899b5818de24a398f5c7718db00bf2f4439".to_string(),
-            ("24.3.0", "windows") => "b12fbf72a24cd31cfbf23975060c061db881300b".to_string(),
+            ("24.3.0", "windows") => "d3d554802cecebf942e2d4e231bd7085d83a9334".to_string(),
             ("24.3.0", "macos") => "ee5e90a3d838739b57ff8804b489b97499210ef4".to_string(),
             _ => String::new(), // Unknown checksum
         }
