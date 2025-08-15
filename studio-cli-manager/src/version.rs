@@ -106,7 +106,8 @@ impl VersionManager {
         let base_url = "https://distro.windriver.com/dist/wrstudio/wrstudio-cli-distro-cd";
 
         // Known versions - in a real implementation, this would be dynamic
-        let versions = vec!["24.3.0", "24.2.0", "24.1.0"];
+        // Ordered from newest to oldest for proper version detection
+        let versions = vec!["25.5.0", "25.1.0", "24.11.2", "24.3.0", "24.2.0", "24.1.0"];
 
         versions
             .into_iter()
@@ -131,6 +132,17 @@ impl VersionManager {
     fn get_checksum_for_version(&self, version: &str, platform: &str) -> String {
         // These would normally come from a manifest file
         match (version, platform) {
+            // Latest versions (2025)
+            ("25.5.0", "linux") => "87cc0e241e8aa21d2520d8fa939e2efa906cd7a6".to_string(),
+            ("25.5.0", "windows") => "0b17cd85f7d5d2ad65674375da290654e44b2d70".to_string(),
+            ("25.5.0", "macos") => "8c1e88adb22581a8f7196cabfcc122228521a0e4".to_string(),
+            ("25.1.0", "linux") => "42503e57c20a6d69650b7c8284f161d60b8b43cc".to_string(),
+            ("25.1.0", "windows") => "f9c5c6bc62c339b4a5bf6d04299696121b48f39f".to_string(),
+            ("25.1.0", "macos") => "04965bcb44ef14238848ceaa42bfbc74d003078b".to_string(),
+            ("24.11.2", "linux") => "7e9116e0c9f08e2b8bcb4b1a589878dc2f60d7c4".to_string(),
+            ("24.11.2", "windows") => "2d694e947b39dd3fbf5395e86070ba7df721b8c1".to_string(),
+            ("24.11.2", "macos") => "8d82c861f089e0013fdd6841e8a6f353d9f3b503".to_string(),
+            // Legacy version
             ("24.3.0", "linux") => "84a03899b5818de24a398f5c7718db00bf2f4439".to_string(),
             ("24.3.0", "windows") => "d3d554802cecebf942e2d4e231bd7085d83a9334".to_string(),
             ("24.3.0", "macos") => "ee5e90a3d838739b57ff8804b489b97499210ef4".to_string(),
