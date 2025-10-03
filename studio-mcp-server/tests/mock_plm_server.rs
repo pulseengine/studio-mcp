@@ -5,12 +5,12 @@
 //! error scenarios, and resource management.
 
 use chrono::{DateTime, Duration, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use wiremock::{
-    matchers::{method, path, path_regex, query_param},
     Mock, MockServer, ResponseTemplate,
+    matchers::{method, path, path_regex, query_param},
 };
 
 /// Comprehensive PLM mock server
@@ -1876,9 +1876,11 @@ mod tests {
         assert!(resources["data"]["cpu"]["total_cores"].as_u64().unwrap() > 0);
         assert!(resources["data"]["memory"]["total_gb"].as_u64().unwrap() > 0);
         // active_builds is u64, so it's always >= 0 - just verify it exists
-        assert!(resources["data"]["builds"]["active_builds"]
-            .as_u64()
-            .is_some());
+        assert!(
+            resources["data"]["builds"]["active_builds"]
+                .as_u64()
+                .is_some()
+        );
     }
 
     #[tokio::test]

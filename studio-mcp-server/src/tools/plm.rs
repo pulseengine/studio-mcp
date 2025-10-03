@@ -1,7 +1,7 @@
 //! PLM (Pipeline Management) tool provider
 
 use pulseengine_mcp_protocol::{Content, Tool};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use std::time::Duration;
 use studio_cli_manager::CliManager;
@@ -1629,28 +1629,28 @@ impl PlmToolProvider {
         let mut cli_args = vec!["plm", "run", "get", &run_id, "--output", "json"];
 
         // Add additional options based on parameters
-        if let Some(run_config) = args.get("run_config").and_then(|v| v.as_bool()) {
-            if run_config {
-                cli_args.push("--run-config");
-            }
+        if let Some(run_config) = args.get("run_config").and_then(|v| v.as_bool())
+            && run_config
+        {
+            cli_args.push("--run-config");
         }
 
-        if let Some(detailed_info) = args.get("detailed_info").and_then(|v| v.as_bool()) {
-            if detailed_info {
-                cli_args.push("--detailed-info");
-            }
+        if let Some(detailed_info) = args.get("detailed_info").and_then(|v| v.as_bool())
+            && detailed_info
+        {
+            cli_args.push("--detailed-info");
         }
 
-        if let Some(include_tasks) = args.get("include_tasks").and_then(|v| v.as_bool()) {
-            if include_tasks {
-                cli_args.push("--include-tasks");
-            }
+        if let Some(include_tasks) = args.get("include_tasks").and_then(|v| v.as_bool())
+            && include_tasks
+        {
+            cli_args.push("--include-tasks");
         }
 
-        if let Some(execution_logs) = args.get("execution_logs").and_then(|v| v.as_bool()) {
-            if execution_logs {
-                cli_args.push("--execution-logs");
-            }
+        if let Some(execution_logs) = args.get("execution_logs").and_then(|v| v.as_bool())
+            && execution_logs
+        {
+            cli_args.push("--execution-logs");
         }
 
         match self.cli_manager.execute(&cli_args, None).await {

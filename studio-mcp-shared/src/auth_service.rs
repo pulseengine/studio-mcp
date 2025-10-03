@@ -1,7 +1,7 @@
 //! Authentication service that integrates with WindRiver Studio CLI
 
 use crate::{AuthCredentials, AuthManager, AuthToken, Result, StudioError, TokenStorage};
-use jsonwebtoken::{decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode_header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -169,24 +169,24 @@ impl StudioAuthService {
         &mut self,
         mut credentials: AuthCredentials,
     ) -> Result<AuthCredentials> {
-        if let Some(token) = &credentials.token {
-            if let Some(refresh_token) = &token.refresh_token {
-                // Attempt token refresh
-                match self
-                    .refresh_token_with_api(&credentials.studio_url, refresh_token)
-                    .await
-                {
-                    Ok(new_token) => {
-                        credentials.set_token(new_token);
-                        self.auth_manager.store_credentials(&credentials).await?;
-                        return Ok(credentials);
-                    }
-                    Err(e) => {
-                        // If refresh fails, credentials are invalid
-                        self.logout(&credentials.instance_id, &credentials.environment)
-                            .await?;
-                        return Err(StudioError::Auth(format!("Token refresh failed: {e}")));
-                    }
+        if let Some(token) = &credentials.token
+            && let Some(refresh_token) = &token.refresh_token
+        {
+            // Attempt token refresh
+            match self
+                .refresh_token_with_api(&credentials.studio_url, refresh_token)
+                .await
+            {
+                Ok(new_token) => {
+                    credentials.set_token(new_token);
+                    self.auth_manager.store_credentials(&credentials).await?;
+                    return Ok(credentials);
+                }
+                Err(e) => {
+                    // If refresh fails, credentials are invalid
+                    self.logout(&credentials.instance_id, &credentials.environment)
+                        .await?;
+                    return Err(StudioError::Auth(format!("Token refresh failed: {e}")));
                 }
             }
         }
@@ -199,13 +199,13 @@ impl StudioAuthService {
     /// Logout and remove stored credentials
     pub async fn logout(&mut self, instance_id: &str, environment: &str) -> Result<()> {
         // Get credentials to notify server
-        if let Ok(credentials) = self.auth_manager.get_credentials(instance_id, environment) {
-            if let Ok(token) = credentials.get_valid_token() {
-                // Attempt to revoke token on server (best effort)
-                let _ = self
-                    .revoke_token(&credentials.studio_url, &token.access_token)
-                    .await;
-            }
+        if let Ok(credentials) = self.auth_manager.get_credentials(instance_id, environment)
+            && let Ok(token) = credentials.get_valid_token()
+        {
+            // Attempt to revoke token on server (best effort)
+            let _ = self
+                .revoke_token(&credentials.studio_url, &token.access_token)
+                .await;
         }
 
         // Remove from local storage

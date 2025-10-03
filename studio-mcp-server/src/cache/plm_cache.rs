@@ -103,8 +103,7 @@ impl PlmCache {
                     );
                     trace!(
                         "Cache miss for PLM key: {} ({}ms)",
-                        full_key,
-                        access_time_ms
+                        full_key, access_time_ms
                     );
                 }
             }
@@ -1184,10 +1183,12 @@ mod tests {
 
         // Verify items exist
         assert!(cache.get(&context, "pipeline:def:test").await.is_some());
-        assert!(cache
-            .get(&context, "run:details:123:completed")
-            .await
-            .is_some());
+        assert!(
+            cache
+                .get(&context, "run:details:123:completed")
+                .await
+                .is_some()
+        );
         assert!(cache.get(&context, "pipelines:list").await.is_some());
         assert!(cache.get(&context, "run:events:456").await.is_some());
 
@@ -1244,10 +1245,12 @@ mod tests {
                 json!({"env": "prod"}),
             )
             .await;
-        assert!(prod_cache
-            .get(&context, "pipeline:def:prod")
-            .await
-            .is_some());
+        assert!(
+            prod_cache
+                .get(&context, "pipeline:def:prod")
+                .await
+                .is_some()
+        );
 
         // Test testing configuration
         let test_cache = PlmCache::with_config(CacheConfig::testing());
@@ -1264,10 +1267,12 @@ mod tests {
                 json!({"env": "test"}),
             )
             .await;
-        assert!(test_cache
-            .get(&context, "pipeline:def:test")
-            .await
-            .is_some());
+        assert!(
+            test_cache
+                .get(&context, "pipeline:def:test")
+                .await
+                .is_some()
+        );
 
         // Verify different TTL values
         let dev_immutable_ttl = dev_cache.config.get_ttl(CacheType::Immutable);

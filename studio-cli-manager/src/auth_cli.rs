@@ -65,10 +65,10 @@ impl AuthenticatedCliManager {
         // Check cache first
         {
             let cache = self.credentials_cache.read().await;
-            if let Some(credentials) = cache.get(&cache_key) {
-                if !credentials.needs_refresh() {
-                    return Ok(credentials.clone());
-                }
+            if let Some(credentials) = cache.get(&cache_key)
+                && !credentials.needs_refresh()
+            {
+                return Ok(credentials.clone());
             }
         }
 

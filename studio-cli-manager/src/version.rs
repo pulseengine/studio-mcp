@@ -80,10 +80,10 @@ impl VersionManager {
 
         {
             let cache = self.cache.read().await;
-            if let Some((timestamp, versions)) = cache.as_ref() {
-                if timestamp.elapsed() < CACHE_DURATION {
-                    return Ok(versions.clone());
-                }
+            if let Some((timestamp, versions)) = cache.as_ref()
+                && timestamp.elapsed() < CACHE_DURATION
+            {
+                return Ok(versions.clone());
             }
         }
 

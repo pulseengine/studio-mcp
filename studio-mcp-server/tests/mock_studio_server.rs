@@ -6,12 +6,12 @@
 //! - Versioned REST API endpoints (/api/v1/ through /api/v5/)
 //! - JSON-RPC 2.0 message format compliance
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use wiremock::{
-    matchers::{header, method, path, path_regex},
     Mock, MockServer, ResponseTemplate,
+    matchers::{header, method, path, path_regex},
 };
 
 /// Mock WindRiver Studio server with complete protocol simulation

@@ -2,10 +2,10 @@
 
 use crate::{Result, StudioError};
 use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit, Nonce};
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Duration, Utc};
 use keyring::Entry;
-use rand::{rngs::OsRng, RngCore};
+use rand::{RngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -404,28 +404,28 @@ impl AuthManager {
     ) -> Result<AuthToken> {
         let mut credentials = self.get_credentials(instance_id, environment)?;
 
-        if let Some(token) = &credentials.token {
-            if let Some(refresh_token) = &token.refresh_token {
-                // Make refresh request to Studio API
-                // For now, create a new mock token
-                let new_token = AuthToken::new(
-                    "refreshed_access_token".to_string(),
-                    Some(refresh_token.clone()),
-                    3600,
-                    token.studio_url.clone(),
-                    token.scopes.clone(),
-                );
+        if let Some(token) = &credentials.token
+            && let Some(refresh_token) = &token.refresh_token
+        {
+            // Make refresh request to Studio API
+            // For now, create a new mock token
+            let new_token = AuthToken::new(
+                "refreshed_access_token".to_string(),
+                Some(refresh_token.clone()),
+                3600,
+                token.studio_url.clone(),
+                token.scopes.clone(),
+            );
 
-                // Update stored credentials
-                credentials.set_token(new_token.clone());
-                self.storage.store_credentials(&credentials)?;
+            // Update stored credentials
+            credentials.set_token(new_token.clone());
+            self.storage.store_credentials(&credentials)?;
 
-                // Update cache
-                let cache_key = format!("{environment}:{instance_id}");
-                self.credentials_cache.insert(cache_key, credentials);
+            // Update cache
+            let cache_key = format!("{environment}:{instance_id}");
+            self.credentials_cache.insert(cache_key, credentials);
 
-                return Ok(new_token);
-            }
+            return Ok(new_token);
         }
 
         Err(StudioError::Auth("No refresh token available".to_string()))
