@@ -157,6 +157,8 @@ async fn test_windriver_studio_mcp_integration() {
                 "quick_operations": 5,
                 "medium_operations": 30,
                 "long_operations": 300,
+                "pipeline_start": 1800,
+                "pipeline_follow": 3600,
                 "network_requests": 60
             }},
             "auto_update": false,
