@@ -134,7 +134,7 @@ impl VersionManager {
         match (version, platform) {
             // Latest versions (2025)
             ("25.5.0", "linux") => "87cc0e241e8aa21d2520d8fa939e2efa906cd7a6".to_string(),
-            ("25.5.0", "windows") => "0b17cd85f7d5d2ad65674375da290654e44b2d70".to_string(),
+            ("25.5.0", "windows") => "d47982ab039ee94243a4496fb48638b849577d62".to_string(),
             ("25.5.0", "macos") => "8c1e88adb22581a8f7196cabfcc122228521a0e4".to_string(),
             ("25.1.0", "linux") => "42503e57c20a6d69650b7c8284f161d60b8b43cc".to_string(),
             ("25.1.0", "windows") => "f9c5c6bc62c339b4a5bf6d04299696121b48f39f".to_string(),
