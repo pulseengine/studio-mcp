@@ -61,7 +61,7 @@ impl CliExecutor {
                 return Err(StudioError::Cli(format!(
                     "Command timed out after {} seconds",
                     timeout_duration.as_secs()
-                )))
+                )));
             }
         };
 

@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::env;
 use tracing::{error, info};
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 
 mod auth_middleware;
 mod cache;

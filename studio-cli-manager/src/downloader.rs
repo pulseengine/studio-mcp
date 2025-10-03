@@ -158,8 +158,8 @@ mod tests {
 
     #[test]
     fn test_gzip_decompression() {
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
 
         let downloader = CliDownloader::new("https://example.com/cli".to_string());
         let original_data = b"test data for compression";

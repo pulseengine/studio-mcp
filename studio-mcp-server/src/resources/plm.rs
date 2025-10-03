@@ -79,20 +79,18 @@ impl PlmResourceProvider {
                     if let Some(pipeline_idx) = args_vec
                         .iter()
                         .position(|arg| arg == "--pipeline" || arg == "-p")
+                        && let Some(pipeline_id) = args_vec.get(pipeline_idx + 1)
                     {
-                        if let Some(pipeline_id) = args_vec.get(pipeline_idx + 1) {
-                            parameters.insert("pipeline_id".to_string(), pipeline_id.clone());
-                        }
+                        parameters.insert("pipeline_id".to_string(), pipeline_id.clone());
                     }
 
                     // Extract run ID
                     if let Some(run_idx) = args_vec
                         .iter()
                         .position(|arg| arg == "--run" || arg == "-r")
+                        && let Some(run_id) = args_vec.get(run_idx + 1)
                     {
-                        if let Some(run_id) = args_vec.get(run_idx + 1) {
-                            parameters.insert("run_id".to_string(), run_id.clone());
-                        }
+                        parameters.insert("run_id".to_string(), run_id.clone());
                     }
 
                     // Extract entity name from positional arguments (e.g., "plm pipeline create my-pipeline")
@@ -540,14 +538,14 @@ impl PlmResourceProvider {
         let cache_key = PlmCache::pipeline_list_key();
 
         // Try cache first
-        if let Some(cached_value) = self.cache.get(&context, &cache_key).await {
-            if let Some(pipelines) = cached_value.get("pipelines").and_then(|v| v.as_array()) {
-                debug!(
-                    "Returning cached pipeline list ({} pipelines)",
-                    pipelines.len()
-                );
-                return Ok(pipelines.clone());
-            }
+        if let Some(cached_value) = self.cache.get(&context, &cache_key).await
+            && let Some(pipelines) = cached_value.get("pipelines").and_then(|v| v.as_array())
+        {
+            debug!(
+                "Returning cached pipeline list ({} pipelines)",
+                pipelines.len()
+            );
+            return Ok(pipelines.clone());
         }
 
         // Cache miss - fetch from CLI

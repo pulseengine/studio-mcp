@@ -493,9 +493,11 @@ mod tests {
 
         // Should match create pattern and invalidate relevant caches
         assert!(!result.matched_patterns.is_empty());
-        assert!(result
-            .matched_patterns
-            .contains(&"plm.pipeline.create".to_string()));
+        assert!(
+            result
+                .matched_patterns
+                .contains(&"plm.pipeline.create".to_string())
+        );
 
         // Test run start operation
         parameters.clear();
@@ -508,8 +510,10 @@ mod tests {
 
         // Should match run start pattern
         assert!(!result.matched_patterns.is_empty());
-        assert!(result
-            .matched_patterns
-            .contains(&"plm.run.start".to_string()));
+        assert!(
+            result
+                .matched_patterns
+                .contains(&"plm.run.start".to_string())
+        );
     }
 }

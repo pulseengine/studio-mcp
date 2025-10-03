@@ -2,7 +2,7 @@
 
 use crate::{AuthToken, Result, StudioError};
 use chrono::{DateTime, Duration, Utc};
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, TokenData, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode, decode_header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -242,18 +242,18 @@ impl TokenValidator {
         // Check cache first
         {
             let cache = self.jwks_cache.read().await;
-            if let Some(entry) = cache.get(studio_url) {
-                if entry.expires_at > Utc::now() {
-                    // Try to find key by kid (key ID)
-                    if let Some(kid) = &header.kid {
-                        if let Some(key) = entry.keys.get(kid) {
-                            return Ok(key.clone());
-                        }
-                    }
-                    // Fallback to first available key
-                    if let Some(key) = entry.keys.values().next() {
-                        return Ok(key.clone());
-                    }
+            if let Some(entry) = cache.get(studio_url)
+                && entry.expires_at > Utc::now()
+            {
+                // Try to find key by kid (key ID)
+                if let Some(kid) = &header.kid
+                    && let Some(key) = entry.keys.get(kid)
+                {
+                    return Ok(key.clone());
+                }
+                // Fallback to first available key
+                if let Some(key) = entry.keys.values().next() {
+                    return Ok(key.clone());
                 }
             }
         }
@@ -483,7 +483,9 @@ mod tests {
 
         // Test valid permissions
         assert!(validator.validate_permissions(&claims, &["read".to_string()]));
-        assert!(validator.validate_permissions(&claims, &["read".to_string(), "write".to_string()]));
+        assert!(
+            validator.validate_permissions(&claims, &["read".to_string(), "write".to_string()])
+        );
 
         // Test invalid permissions
         assert!(!validator.validate_permissions(&claims, &["super-admin".to_string()]));

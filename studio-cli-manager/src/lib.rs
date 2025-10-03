@@ -126,26 +126,24 @@ impl CliManager {
         if let Some(pipeline_idx) = args
             .iter()
             .position(|&arg| arg == "--pipeline" || arg == "-p")
+            && let Some(pipeline_id) = args.get(pipeline_idx + 1)
         {
-            if let Some(pipeline_id) = args.get(pipeline_idx + 1) {
-                parameters.insert("pipeline_id".to_string(), pipeline_id.to_string());
-            }
+            parameters.insert("pipeline_id".to_string(), pipeline_id.to_string());
         }
 
-        if let Some(run_idx) = args.iter().position(|&arg| arg == "--run" || arg == "-r") {
-            if let Some(run_id) = args.get(run_idx + 1) {
-                parameters.insert("run_id".to_string(), run_id.to_string());
-            }
+        if let Some(run_idx) = args.iter().position(|&arg| arg == "--run" || arg == "-r")
+            && let Some(run_id) = args.get(run_idx + 1)
+        {
+            parameters.insert("run_id".to_string(), run_id.to_string());
         }
 
         // For commands like "plm pipeline create my-pipeline", extract the pipeline name
         if operation_parts.len() >= 3
             && operation_parts[0] == "plm"
             && operation_parts[1] == "pipeline"
+            && let Some(pipeline_name) = operation_parts.get(3)
         {
-            if let Some(pipeline_name) = operation_parts.get(3) {
-                parameters.insert("pipeline_name".to_string(), pipeline_name.to_string());
-            }
+            parameters.insert("pipeline_name".to_string(), pipeline_name.to_string());
         }
 
         (operation, parameters)
@@ -245,12 +243,12 @@ impl CliManager {
         if self.install_dir.exists() {
             for entry in std::fs::read_dir(&self.install_dir)? {
                 let entry = entry?;
-                if entry.file_type()?.is_dir() {
-                    if let Some(name) = entry.file_name().to_str() {
-                        let cli_path = self.get_cli_path(name);
-                        if cli_path.exists() {
-                            versions.push(name.to_string());
-                        }
+                if entry.file_type()?.is_dir()
+                    && let Some(name) = entry.file_name().to_str()
+                {
+                    let cli_path = self.get_cli_path(name);
+                    if cli_path.exists() {
+                        versions.push(name.to_string());
                     }
                 }
             }

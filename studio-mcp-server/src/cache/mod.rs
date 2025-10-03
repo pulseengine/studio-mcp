@@ -444,13 +444,14 @@ impl CacheStats {
         }
 
         // Track hottest keys (most accessed)
-        if let Some(key) = key {
-            if hit && !perf.hottest_keys.contains(&key.to_string()) {
-                perf.hottest_keys.push(key.to_string());
-                // Keep only top 10 hottest keys
-                if perf.hottest_keys.len() > 10 {
-                    perf.hottest_keys.remove(0);
-                }
+        if let Some(key) = key
+            && hit
+            && !perf.hottest_keys.contains(&key.to_string())
+        {
+            perf.hottest_keys.push(key.to_string());
+            // Keep only top 10 hottest keys
+            if perf.hottest_keys.len() > 10 {
+                perf.hottest_keys.remove(0);
             }
         }
     }
