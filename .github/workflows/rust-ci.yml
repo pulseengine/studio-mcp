@@ -68,10 +68,10 @@ jobs:
       run: |
         # Create a temporary config for testing
         ./target/release/studio-mcp-server --init test-config.json
-        
+
         # Test MCP Inspector can connect (run for 5 seconds then exit)
         timeout 5s npx --yes @modelcontextprotocol/inspector ./target/release/studio-mcp-server test-config.json --stdio || true
-        
+
         # Clean up
         rm -f test-config.json
       shell: bash
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     if: always()
-    
+
     steps:
     - name: Check test results
       run: |

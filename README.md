@@ -1,8 +1,11 @@
 # WindRiver Studio MCP Server
 
-A production-ready Model Context Protocol (MCP) server providing AI assistants with secure access to WindRiver Studio CLI functionality, focusing on Pipeline Management (PLM) features.
+[![GitHub Release](https://img.shields.io/github/v/release/pulseengine/studio-mcp?label=version)](https://github.com/pulseengine/studio-mcp/releases)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/pulseengine/studio-mcp/rust-ci.yml?branch=main&label=CI)](https://github.com/pulseengine/studio-mcp/actions)
+[![npm version](https://img.shields.io/npm/v/@pulseengine/studio-mcp-server)](https://www.npmjs.com/package/@pulseengine/studio-mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**Current Version: 0.2.15** - Built with PulseEngine MCP 0.7.0
+A production-ready Model Context Protocol (MCP) server providing AI assistants with secure access to WindRiver Studio CLI functionality, focusing on Pipeline Management (PLM) features.
 
 ## Features
 
@@ -161,10 +164,8 @@ The server works with any MCP-compatible client:
 
 ## Development Status
 
-**Current Release: v0.2.15** - Production-ready with PulseEngine MCP 0.7.0
-
 ### ✅ Completed Features
-- **Core MCP Server**: Full PulseEngine MCP 0.7.0 integration
+- **Core MCP Server**: Full PulseEngine MCP integration
 - **CLI Management**: Automatic download, version management, and execution
 - **Pipeline Management**: Complete PLM resource and tool providers
 - **Intelligent Caching**: Multi-layer caching with performance monitoring
