@@ -1,11 +1,11 @@
 [package]
 name = "studio-mcp-server"
-version = "0.4.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 description = "Model Context Protocol server for WindRiver Studio CLI"
-license = "MIT"
-authors = ["PulseEngine Team"]
-repository = "https://github.com/pulseengine/studio-mcp"
 
 [dependencies]
 tokio = { workspace = true }
