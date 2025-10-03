@@ -14,9 +14,9 @@ try {
 
 // Run the binary directly with all arguments passed through
 const [, , ...args] = process.argv;
-const result = spawnSync(binaryPath, args, { 
-  cwd: process.cwd(), 
-  stdio: "inherit" 
+const result = spawnSync(binaryPath, args, {
+  cwd: process.cwd(),
+  stdio: "inherit"
 });
 
 if (result.error) {

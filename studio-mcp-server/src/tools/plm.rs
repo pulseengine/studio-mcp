@@ -474,7 +474,7 @@ impl PlmToolProvider {
                             "description": "Show logs since timestamp (ISO format)"
                         },
                         "query_since": {
-                            "type": "string", 
+                            "type": "string",
                             "description": "Query logs since timestamp (more precise than since)"
                         },
                         "query_until": {
@@ -748,7 +748,7 @@ impl PlmToolProvider {
                             "description": "Task definition in YAML or JSON format"
                         },
                         "definition_file": {
-                            "type": "string", 
+                            "type": "string",
                             "description": "Path to YAML/JSON file containing task definition"
                         },
                         "name": {
@@ -2617,12 +2617,16 @@ impl PlmToolProvider {
         let old_param_name = args
             .get("old_param_name")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| StudioError::InvalidOperation("old_param_name is required".to_string()))?;
+            .ok_or_else(|| {
+                StudioError::InvalidOperation("old_param_name is required".to_string())
+            })?;
 
         let new_param_name = args
             .get("new_param_name")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| StudioError::InvalidOperation("new_param_name is required".to_string()))?;
+            .ok_or_else(|| {
+                StudioError::InvalidOperation("new_param_name is required".to_string())
+            })?;
 
         cli_args.extend_from_slice(&["--old-param-name", old_param_name]);
         cli_args.extend_from_slice(&["--new-param-name", new_param_name]);
@@ -2694,7 +2698,10 @@ impl PlmToolProvider {
         }
 
         // Handle create_ssh flag (default is true)
-        let create_ssh = args.get("create_ssh").and_then(|v| v.as_bool()).unwrap_or(true);
+        let create_ssh = args
+            .get("create_ssh")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
         if !create_ssh {
             cli_args.push("--create-ssh=false");
         }
